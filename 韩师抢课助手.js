@@ -1,13 +1,15 @@
 // ==UserScript==
 // @name         韩师抢课助手
-// @namespace    http://tampermonkey.net/
+// @namespace    https://gitee.com/mangohia/hstc-course-grabber
 // @version      1.0
 // @description  韩山师范学院自动抢选修课，到点自动点击选课按钮
-// @author       Hermes Agent
+// @author       mangohia
 // @match        *://webvpn.hstc.edu.cn/*eams/stdElectCourse*
 // @match        http://localhost:8888/*
 // @match        http://127.0.0.1:8888/*
 // @icon         https://www.hstc.edu.cn/favicon.ico
+// @downloadURL  https://gitee.com/mangohia/hstc-course-grabber/raw/main/韩师抢课助手.js
+// @updateURL    https://gitee.com/mangohia/hstc-course-grabber/raw/main/韩师抢课助手.js
 // @grant        none
 // ==/UserScript==
 
