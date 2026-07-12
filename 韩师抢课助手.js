@@ -8,8 +8,8 @@
 // @match        http://localhost:8888/*
 // @match        http://127.0.0.1:8888/*
 // @icon         https://www.hstc.edu.cn/favicon.ico
-// @downloadURL  https://gitee.com/mangohia/hstc-course-grabber/raw/main/韩师抢课助手.user.js
-// @updateURL    https://gitee.com/mangohia/hstc-course-grabber/raw/main/韩师抢课助手.user.js
+// @downloadURL  https://gitee.com/mangohia/hstc-course-grabber/raw/main/韩师抢课助手.js
+// @updateURL    https://gitee.com/mangohia/hstc-course-grabber/raw/main/韩师抢课助手.js
 // @grant        none
 // ==/UserScript==
 
@@ -17,6 +17,9 @@
     'use strict';
 
     // ===== 配置区 =====
+    // 开抢时间（24小时制）
+    const GRAB_TIME = { hour: 14, minute: 0, second: 0 };
+
     // 抢到后是否自动切换到「已选课程」标签确认
     const AUTO_CHECK = true;
 
@@ -62,8 +65,8 @@
             ">
                 🎯 韩师抢课助手
             </div>
-            <div id="hstc-countdown" style="font-size:16px;color:#333;text-align:center;padding:8px;background:#f0f7ff;border-radius:8px;margin-bottom:10px;">
-                输入课程名后点击下方按钮 🚀
+            <div id="hstc-countdown" style="font-size:20px;font-weight:bold;color:#333;text-align:center;padding:8px;background:#f0f7ff;border-radius:8px;margin-bottom:10px;">
+                加载中...
             </div>
             <div style="margin-bottom:6px;color:#666;font-size:13px;">
                 目标课程（每行一个）：
@@ -133,9 +136,28 @@
         console.log(`[抢课助手] ${msg}`);
     }
 
-    // 显示面板初始状态
+    // 倒计时
     function startCountdown() {
-        updateCountdown('输入课程名后点击下方按钮 🚀');
+        const now = new Date();
+        const target = new Date();
+        target.setHours(GRAB_TIME.hour, GRAB_TIME.minute, GRAB_TIME.second, 0);
+
+        // 如果已经过了今天的目标时间，说明抢课可能已经开始了
+        if (now >= target) {
+            updateCountdown('⏰ 开抢时间已到！');
+            addLog('检测到时间已到，开始抢课！');
+            startGrabbing();
+            return;
+        }
+
+        const diff = target - now;
+        const h = Math.floor(diff / 3600000);
+        const m = Math.floor((diff % 3600000) / 60000);
+        const s = Math.floor((diff % 60000) / 1000);
+        updateCountdown(`⏰ ${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`);
+
+        // 每秒更新
+        setTimeout(startCountdown, 1000);
     }
 
     // 查找表格中所有选课按钮
