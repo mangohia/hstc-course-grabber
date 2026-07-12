@@ -8,8 +8,8 @@
 // @match        http://localhost:8888/*
 // @match        http://127.0.0.1:8888/*
 // @icon         https://www.hstc.edu.cn/favicon.ico
-// @downloadURL  https://gitee.com/mangohia/hstc-course-grabber/raw/main/韩师抢课助手.js
-// @updateURL    https://gitee.com/mangohia/hstc-course-grabber/raw/main/韩师抢课助手.js
+// @downloadURL  https://gitee.com/mangohia/hstc-course-grabber/raw/main/韩师抢课助手.user.js
+// @updateURL    https://gitee.com/mangohia/hstc-course-grabber/raw/main/韩师抢课助手.user.js
 // @grant        none
 // ==/UserScript==
 

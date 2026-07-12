@@ -13,7 +13,7 @@
 
 ### 安装脚本
 
-👉 **[点此安装韩师抢课助手](https://gitee.com/mangohia/hstc-course-grabber/raw/main/%E9%9F%A9%E5%B8%88%E6%8A%A2%E8%AF%BE%E5%8A%A9%E6%89%8B.js)**
+👉 **[点此安装韩师抢课助手](https://gitee.com/mangohia/hstc-course-grabber/raw/main/%E9%9F%A9%E5%B8%88%E6%8A%A2%E8%AF%BE%E5%8A%A9%E6%89%8B.user.js)**
 
 浏览器打开上面链接，Tampermonkey 会自动弹出安装页面，点「安装」即可。
 
