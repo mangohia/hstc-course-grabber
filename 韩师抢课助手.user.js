@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      2.1
+// @version      2.2
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://webvpn.hstc.edu.cn/*eams/stdElectCourse*
@@ -397,8 +397,8 @@
                 addLog('✅ 全部课程已抢到！');
                 updateCountdown('✅ 全部完成！');
                 status.done = true;
-                const btn = document.getElementById('hstc-action-btn');
-                if (btn) { btn.textContent = '✅ 已完成'; btn.style.background = '#27ae60'; btn.disabled = true; }
+                const manualBtn = document.getElementById('hstc-manual-start');
+                if (manualBtn) { manualBtn.textContent = '🔄 继续抢课'; manualBtn.style.background = '#27ae60'; manualBtn.disabled = false; }
                 if (AUTO_CHECK) {
                     setTimeout(switchToSelectedTab, 1000);
                 }
@@ -604,6 +604,32 @@
 
         // --- 「立即开抢（手动）」按钮 ---
         document.getElementById('hstc-manual-start').addEventListener('click', function() {
+            if (status.done) {
+                // 抢完了 → 重置回输入界面
+                status.done = false;
+                status.started = false;
+                status.stopped = false;
+                status.clicked = [];
+                status.confirmed = [];
+                status.courses = [];
+
+                const input = document.getElementById('hstc-course-input');
+                if (input) input.style.display = 'block';
+
+                const statusDiv = document.querySelector('#hstc-course-status');
+                if (statusDiv) {
+                    statusDiv.style.display = 'none';
+                    statusDiv.innerHTML = '';
+                }
+
+                this.textContent = '⚡ 立即开抢（手动）';
+                this.style.background = '#e67e22';
+
+                addLog('🔄 已重置，可输入新课名继续抢课');
+                updateCountdown('🔄 已重置，输入新课名开始');
+                return;
+            }
+
             if (status.started && !status.done) {
                 // 正在运行 → 停止，恢复可编辑状态
                 status.stopped = true;
