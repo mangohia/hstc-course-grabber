@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      3.1
+// @version      3.2
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -336,6 +336,7 @@
     function startGrabbing(courses) {
         if (status.started) return;
         status.started = true;
+        status.stopped = false;
         status.courses = courses || [];
 
         if (status.courses.length === 0) {
