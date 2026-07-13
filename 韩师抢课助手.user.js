@@ -21,6 +21,7 @@
     const CONFIRM_WAIT = 1500;            // 点击选课后等弹窗的时间(ms)
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
+    const SCRIPT_VER = (function() { try { return document.currentScript.textContent.match(/@version\s+(\S+)/)?.[1] || '3'; } catch(e) { return '3'; } })();
 
     // ===== 状态 =====
     let status = {
@@ -156,7 +157,7 @@
         const { hrs, mins } = timeSelectOptions();
         return `
             <div id="hstc-drag-handle" style="cursor:move;user-select:none;padding:12px 0;margin-bottom:4px;font-weight:bold;font-size:16px;color:#238FBF;">
-                🎯 韩师抢课助手 <span style="font-weight:normal;font-size:11px;color:#999;">v2</span>
+                🎯 韩师抢课助手 <span style="font-weight:normal;font-size:11px;color:#999;">v${SCRIPT_VER}</span>
             </div>
 
             <div id="hstc-countdown" style="font-size:18px;font-weight:bold;color:#333;text-align:center;padding:8px;background:#f0f7ff;border-radius:8px;margin-bottom:8px;">
@@ -220,7 +221,7 @@
     function buildRunningPanelHTML() {
         return `
             <div id="hstc-drag-handle" style="cursor:move;user-select:none;padding:12px 0;margin-bottom:4px;font-weight:bold;font-size:16px;color:#238FBF;">
-                🎯 韩师抢课助手 <span style="font-weight:normal;font-size:11px;color:#999;">v2</span>
+                🎯 韩师抢课助手 <span style="font-weight:normal;font-size:11px;color:#999;">v${SCRIPT_VER}</span>
             </div>
 
             <div id="hstc-countdown" style="font-size:18px;font-weight:bold;color:#333;text-align:center;padding:8px;background:#f0f7ff;border-radius:8px;margin-bottom:8px;">
