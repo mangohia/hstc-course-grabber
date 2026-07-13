@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      2.8
+// @version      2.9
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -364,20 +364,32 @@
         let pagCurrentIdx = 0;
         let pagAttemptsOnPage = 0;
         try {
-            const allLinks = document.querySelectorAll('a, span');
+            // 优先找带 pageno 属性的链接（如 <a pageno="1">1</a>）
+            const pgLinks = document.querySelectorAll('a[pageno]');
             const seenPages = new Set();
-            for (const el of allLinks) {
-                if (el.closest('table')) continue; // 跳过课程表格内的
-                const t = el.textContent.trim();
-                const n = parseInt(t);
-                if (!isNaN(n) && t === String(n) && n > 0 && n < 1000 && !seenPages.has(n)) {
+            for (const el of pgLinks) {
+                const n = parseInt(el.getAttribute('pageno'));
+                if (n > 0 && n < 1000 && !seenPages.has(n)) {
                     seenPages.add(n);
                     pagPages.push({ element: el, page: n });
                 }
             }
+            // 如果没找到 pageno，退回到找表格外的纯数字链接
+            if (pagPages.length === 0) {
+                const allLinks = document.querySelectorAll('a, span');
+                for (const el of allLinks) {
+                    if (el.closest('table')) continue;
+                    const t = el.textContent.trim();
+                    const n = parseInt(t);
+                    if (!isNaN(n) && t === String(n) && n > 0 && n < 1000 && !seenPages.has(n)) {
+                        seenPages.add(n);
+                        pagPages.push({ element: el, page: n });
+                    }
+                }
+            }
             pagPages.sort((a, b) => a.page - b.page);
             if (pagPages.length > 1) {
-                addLog(`📄 检测到 ${pagPages.length} 页分页（1-${pagPages[pagPages.length-1].page}），将自动翻页`);
+                addLog(`📄 检测到 ${pagPages.length} 页分页，将自动翻页`);
             }
         } catch (e) { /* 静默失败 */ }
         pagCurrentIdx = 0;
