@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      3.4
+// @version      3.5
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -21,7 +21,7 @@
     const CONFIRM_WAIT = 1500;            // 点击选课后等弹窗的时间(ms)
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '3.4';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '3.5';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -361,46 +361,27 @@
             }
         } catch (e) { /* 静默失败 */ }
 
-        // 检测分页
-        let hasPagination = false;
-        let pagAttemptsOnPage = 0;
+        // 检测分页（基于 pageno 属性）
+        let pagTotal = 0, pagTarget = 1, pagPendingNav = false, pagWaitTicks = 0;
         try {
-            // 检查有没有"下一页"按钮
-            for (const el of document.querySelectorAll('a, span')) {
-                const t = el.textContent.trim();
-                if (t === '下一页' || t === '>' || t === '»' || t === '下页') {
-                    if (!el.closest('table')) {
-                        hasPagination = true;
-                        addLog('📄 检测到分页，将自动翻页');
-                        break;
-                    }
+            const allP = document.querySelectorAll('a[pageno]');
+            for (const el of allP) {
+                const n = parseInt(el.getAttribute('pageno'));
+                if (n > pagTotal) pagTotal = n;
+            }
+            if (pagTotal > 1) {
+                const curEl = document.querySelector('a.pgButtonHover, a.current, a.active');
+                let curPage = 1;
+                if (curEl) {
+                    const cn = parseInt(curEl.getAttribute('pageno') || curEl.textContent.trim());
+                    if (cn > 0) curPage = cn;
+                }
+                if (curPage !== 1) {
+                    const p1 = document.querySelector('a[pageno="1"]');
+                    if (p1) { p1.click(); pagPendingNav = true; addLog('📄 跳转到第1页开始扫描...'); }
                 }
             }
-            // 也检查 pageno 属性（备用）
-            if (!hasPagination && document.querySelectorAll('a[pageno]').length > 1) {
-                hasPagination = true;
-                addLog('📄 检测到分页，将自动翻页');
-            }
-        } catch (e) { /* 静默失败 */ }
-        pagAttemptsOnPage = 0;
-
-        // 如果不在第1页，先跳回第1页再从前往后翻
-        let pagResetWait = 0;
-        if (hasPagination) {
-            try {
-                const p1 = document.querySelector('a[pageno="1"], a.pgFirst');
-                if (p1) {
-                    const isCurrent = p1.classList.contains('pgButtonHover') ||
-                                     p1.classList.contains('current') ||
-                                     p1.classList.contains('active');
-                    if (!isCurrent) {
-                        p1.click();
-                        pagResetWait = 1;
-                        addLog('📄 跳转到第1页开始扫描...');
-                    }
-                }
-            } catch (e) { /* 静默 */ }
-        }
+        } catch (e) { /* 静默 */ }
 
         addLog(`🚀 开始抢课！目标: ${status.courses.join(', ')}`);
 
@@ -425,15 +406,16 @@
         function attemptGrab() {
             if (status.stopped) return;
 
-            // 等待跳转到第1页的 AJAX 加载完成
-            if (pagResetWait > 0) {
-                pagResetWait++;
-                if (pagResetWait < 4) {
+            // 等待 AJAX 翻页加载完成
+            if (pagPendingNav) {
+                pagWaitTicks++;
+                if (pagWaitTicks < 6) {
                     status.timer = setTimeout(attemptGrab, 500);
                     return;
                 }
-                pagResetWait = 0;
-                addLog('📄 已回到第1页，开始逐页扫描');
+                pagPendingNav = false;
+                pagWaitTicks = 0;
+                addLog(`📄 已到第 ${pagTarget} 页，开始扫描`);
             }
 
             attempts++;
@@ -489,29 +471,22 @@
                 return;
             }
 
-            // 自动翻页：当前页没找全，点"下一页"
-            if (hasPagination && !status.stopped) {
-                pagAttemptsOnPage++;
-                if (pagAttemptsOnPage >= 2) {
-                    pagAttemptsOnPage = 0;
-                    // 每次重新查 DOM，避免 AJAX 后元素失效
-                    let clicked = false;
-                    for (const el of document.querySelectorAll('a, span, input, button')) {
-                        if (el.closest('table')) continue;
-                        const t = el.textContent.trim();
-                        if ((t === '下一页' || t === '>' || t === '»') && !el.disabled) {
-                            // 确保不是数字页码
-                            if (isNaN(parseInt(t))) {
-                                el.click();
-                                addLog('📄 翻到下一页继续查找...');
-                                clicked = true;
-                                break;
-                            }
+            // 翻到下一页（基于 pageno 属性）
+            if (pagTotal > 1 && !status.stopped && !pagPendingNav) {
+                pagWaitTicks++;
+                if (pagWaitTicks >= 2) {
+                    pagWaitTicks = 0;
+                    if (pagTarget < pagTotal) {
+                        pagTarget++;
+                        const targetEl = document.querySelector(`a[pageno="${pagTarget}"]`);
+                        if (targetEl && !targetEl.classList.contains('pgButtonHover')) {
+                            targetEl.click();
+                            pagPendingNav = true;
+                            addLog(`📄 翻到第 ${pagTarget} 页...`);
                         }
-                    }
-                    if (!clicked) {
-                        hasPagination = false; // 没有下一页了
-                        addLog('📄 已翻到最后一页');
+                    } else {
+                        pagTotal = 0; // 全部翻完
+                        addLog('📄 已扫描完所有页面');
                     }
                 }
             }
