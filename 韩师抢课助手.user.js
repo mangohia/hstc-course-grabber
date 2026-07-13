@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      3.6
+// @version      3.7
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -21,7 +21,7 @@
     const CONFIRM_WAIT = 1500;            // 点击选课后等弹窗的时间(ms)
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '3.6';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '3.7';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -361,8 +361,8 @@
             }
         } catch (e) { /* 静默失败 */ }
 
-        // 检测分页（基于 pageno 属性）
-        let pagTotal = 0, pagTarget = 1, pagPendingNav = false, pagWaitTicks = 0;
+        // 检测分页，准备自动翻页
+        let pagTotal = 0, pagGoingBack = true, pagPendingNav = false, pagWaitTicks = 0;
         try {
             const allP = document.querySelectorAll('a[pageno]');
             for (const el of allP) {
@@ -370,16 +370,17 @@
                 if (n > pagTotal) pagTotal = n;
             }
             if (pagTotal > 1) {
+                // 先判断当前在第几页，再决定方向
                 const curEl = document.querySelector('a.pgButtonHover, a.current, a.active');
                 let curPage = 1;
                 if (curEl) {
                     const cn = parseInt(curEl.getAttribute('pageno') || curEl.textContent.trim());
                     if (cn > 0) curPage = cn;
                 }
-                if (curPage !== 1) {
-                    const p1 = document.querySelector('a[pageno="1"]');
-                    if (p1) { p1.click(); pagPendingNav = true; addLog('📄 跳转到第1页开始扫描...'); }
-                }
+                // 如果已经在第1页，直接向前翻；否则先往回翻
+                pagGoingBack = curPage > 1;
+                if (pagGoingBack) addLog(`📄 从第${curPage}页往回翻到第1页`);
+                else addLog(`📄 从第1页开始向前扫描`);
             }
         } catch (e) { /* 静默 */ }
 
@@ -471,22 +472,34 @@
                 return;
             }
 
-            // 翻到下一页（基于 pageno 属性）
+            // 翻页：先往回走到第1页，再向前走到最后一页
             if (pagTotal > 1 && !status.stopped && !pagPendingNav) {
                 pagWaitTicks++;
                 if (pagWaitTicks >= 1) {
                     pagWaitTicks = 0;
-                    if (pagTarget < pagTotal) {
-                        pagTarget++;
-                        const targetEl = document.querySelector(`a[pageno="${pagTarget}"]`);
-                        if (targetEl && !targetEl.classList.contains('pgButtonHover')) {
-                            targetEl.click();
-                            pagPendingNav = true;
-                            addLog(`📄 翻到第 ${pagTarget} 页...`);
+                    const btnText = pagGoingBack ? '上一页' : '下一页';
+                    const altTexts = pagGoingBack ? ['<', '«', '上页'] : ['>', '»'];
+                    let clicked = false;
+                    for (const el of document.querySelectorAll('a, span')) {
+                        if (el.closest('table')) continue;
+                        const t = el.textContent.trim();
+                        if (t === btnText || altTexts.includes(t)) {
+                            if (!el.disabled && !el.classList.contains('disabled')) {
+                                el.click();
+                                pagPendingNav = true;
+                                clicked = true;
+                                break;
+                            }
                         }
-                    } else {
-                        pagTotal = 0; // 全部翻完
-                        addLog('📄 已扫描完所有页面');
+                    }
+                    if (!clicked) {
+                        if (pagGoingBack) {
+                            pagGoingBack = false; // 回到第1页了，改向前翻
+                            addLog('📄 已到第1页，开始向前翻');
+                        } else {
+                            pagTotal = 0; // 全部翻完
+                            addLog('📄 已扫描完所有页面');
+                        }
                     }
                 }
             }
