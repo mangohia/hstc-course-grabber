@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      2.4
+// @version      2.5
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -236,36 +236,16 @@
     function findAllCourseButtons() {
         const buttons = [];
         const links = document.querySelectorAll('a.lessonListOperator[operator="ELECTION"]');
-
-        // 自动识别课程名列：扫表头<th>
-        let courseColIdx = -1;
-        const firstTable = document.querySelector('table');
-        if (firstTable) {
-            const headers = firstTable.querySelectorAll('th');
-            const keywords = ['课程名称', '课程名', '课程'];
-            for (let i = 0; i < headers.length; i++) {
-                const text = headers[i].textContent.trim();
-                if (keywords.some(k => text.includes(k))) {
-                    courseColIdx = i;
-                    break;
-                }
-            }
-        }
-
         for (const el of links) {
             if (el.textContent && el.textContent.trim() === '选课') {
                 const row = el.closest('tr') || el.parentElement;
                 if (row) {
                     const cells = row.querySelectorAll('td');
-                    let courseName = '';
-                    if (courseColIdx >= 0 && cells.length > courseColIdx) {
-                        // 精确提取课程名列
-                        courseName = cells[courseColIdx].textContent.trim();
-                    }
+                    // 收集所有单元格文本，逐一匹配
+                    const cellTexts = Array.from(cells).map(c => c.textContent.trim());
                     buttons.push({
                         element: el,
-                        courseName: courseName,
-                        rowText: row.textContent || ''
+                        cellTexts: cellTexts
                     });
                 }
             }
@@ -385,10 +365,8 @@
 
                 let found = false;
                 for (const btnInfo of allBtns) {
-                    // 有课程名列就用精确匹配，否则回退到整行查找
-                    const match = btnInfo.courseName
-                        ? btnInfo.courseName.includes(courseName)
-                        : btnInfo.rowText.includes(courseName);
+                    // 逐一检查每个单元格，匹配即可
+                    const match = btnInfo.cellTexts.some(t => t.includes(courseName));
                     if (match) {
                         found = true;
                         if (!status.clicked.includes(index)) {
