@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      2.5
+// @version      2.6
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -110,6 +110,18 @@
             el.scrollTop = el.scrollHeight;
         }
         console.log(`[抢课助手] ${msg}`);
+    }
+
+    // 重置界面到初始状态（显示输入框，清空课程状态）
+    function resetUI() {
+        const input = document.getElementById('hstc-course-input');
+        if (input) input.style.display = 'block';
+        const statusDiv = document.getElementById('hstc-course-status');
+        if (statusDiv) {
+            statusDiv.innerHTML = '';
+            statusDiv.style.display = 'none';
+        }
+        updateCountdown('输入课程名，选择开抢时间 🚀');
     }
 
     function createPanel(htmlContent) {
@@ -358,44 +370,50 @@
             attempts++;
             addLog(`第 ${attempts} 次尝试...`);
 
-            const allBtns = findAllCourseButtons();
+            try {
+                const allBtns = findAllCourseButtons();
 
-            status.courses.forEach((courseName, index) => {
-                if (status.confirmed.includes(index)) return;
+                status.courses.forEach((courseName, index) => {
+                    if (status.confirmed.includes(index)) return;
 
-                let found = false;
-                for (const btnInfo of allBtns) {
-                    // 逐一检查每个单元格，匹配即可
-                    const match = btnInfo.cellTexts.some(t => t.includes(courseName));
-                    if (match) {
-                        found = true;
-                        if (!status.clicked.includes(index)) {
-                            addLog(`🎯 找到「${courseName}」，正在点击选课...`);
-                            updateCourseStatus(index, '🔄 点击中...', '#f90');
-                            btnInfo.element.click();
-                            status.clicked.push(index);
+                    let found = false;
+                    for (const btnInfo of allBtns) {
+                        // 逐一检查每个单元格，匹配即可
+                        const match = btnInfo.cellTexts.some(t => t.includes(courseName));
+                        if (match) {
+                            found = true;
+                            if (!status.clicked.includes(index)) {
+                                addLog(`🎯 找到「${courseName}」，正在点击选课...`);
+                                updateCourseStatus(index, '🔄 点击中...', '#f90');
+                                btnInfo.element.click();
+                                status.clicked.push(index);
 
-                            setTimeout(() => {
-                                handleConfirm(courseName, index);
-                            }, CONFIRM_WAIT);
+                                setTimeout(() => {
+                                    handleConfirm(courseName, index);
+                                }, CONFIRM_WAIT);
+                            }
+                            break;
                         }
-                        break;
                     }
-                }
 
-                if (!found && !status.clicked.includes(index)) {
-                    updateCourseStatus(index, '🔍 未出现', '#999');
-                }
-            });
+                    if (!found && !status.clicked.includes(index)) {
+                        updateCourseStatus(index, '🔍 未出现', '#999');
+                    }
+                });
+            } catch (e) {
+                addLog(`⚠️ 抢课循环异常: ${e.message}`);
+            }
 
+            // 检查是否全部完成
             if (status.confirmed.length === status.courses.length) {
                 status.stopped = true;
-                if (status.timer) clearTimeout(status.timer);
+                if (status.timer) { clearTimeout(status.timer); status.timer = null; }
                 addLog('✅ 全部课程已抢到！');
                 updateCountdown('✅ 全部完成！');
                 status.done = true;
+                status.started = false;
                 const manualBtn = document.getElementById('hstc-manual-start');
-                if (manualBtn) { manualBtn.textContent = '🔄 继续抢课'; manualBtn.style.background = '#27ae60'; manualBtn.disabled = false; }
+                if (manualBtn) { manualBtn.textContent = '🔄 重新开抢'; manualBtn.style.background = '#238FBF'; manualBtn.disabled = false; }
                 if (AUTO_CHECK) {
                     setTimeout(switchToSelectedTab, 1000);
                 }
@@ -407,6 +425,10 @@
             } else if (!status.stopped) {
                 addLog('⏰ 尝试次数已达上限，请手动操作');
                 updateCountdown('⚠️ 请手动操作');
+                status.done = true;
+                status.started = false;
+                const manualBtn = document.getElementById('hstc-manual-start');
+                if (manualBtn) { manualBtn.textContent = '🔄 重新开抢'; manualBtn.style.background = '#238FBF'; manualBtn.disabled = false; }
             }
         }
 
@@ -601,69 +623,33 @@
 
         // --- 「立即开抢（手动）」按钮 ---
         document.getElementById('hstc-manual-start').addEventListener('click', function() {
-            if (status.done) {
-                // 抢完了 → 重置回输入界面
-                status.done = false;
-                status.started = false;
-                status.stopped = false;
-                status.clicked = [];
-                status.confirmed = [];
-                status.courses = [];
-
-                const input = document.getElementById('hstc-course-input');
-                if (input) input.style.display = 'block';
-
-                const statusDiv = document.querySelector('#hstc-course-status');
-                if (statusDiv) {
-                    statusDiv.style.display = 'none';
-                    statusDiv.innerHTML = '';
-                }
-
-                this.textContent = '⚡ 立即开抢（手动）';
-                this.style.background = '#e67e22';
-
-                addLog('🔄 已重置，可输入新课名继续抢课');
-                updateCountdown('🔄 已重置，输入新课名开始');
-                return;
-            }
-
+            // 情况1：正在运行 → 停止
             if (status.started && !status.done) {
-                // 正在运行 → 停止，恢复可编辑状态
                 status.stopped = true;
-                if (status.timer) clearTimeout(status.timer);
+                if (status.timer) { clearTimeout(status.timer); status.timer = null; }
                 status.started = false;
-                status.clicked = [];
-                status.confirmed = [];
-                status.courses = [];
-
-                // 恢复输入框
-                const input = document.getElementById('hstc-course-input');
-                if (input) input.style.display = 'block';
-
-                // 隐藏课程状态
-                const statusDiv = document.querySelector('#hstc-course-status');
-                if (statusDiv) {
-                    statusDiv.style.display = 'none';
-                    statusDiv.innerHTML = '';
-                }
-
-                // 恢复按钮
+                status.courses = []; status.clicked = []; status.confirmed = [];
+                resetUI();
                 this.textContent = '⚡ 立即开抢（手动）';
                 this.style.background = '#e67e22';
-                this.disabled = false;
-
                 // 恢复自动模式按钮
                 const actionBtn = document.getElementById('hstc-action-btn');
-                if (actionBtn) {
-                    actionBtn.textContent = '🚀 启动自动模式';
-                    actionBtn.disabled = false;
-                }
-
+                if (actionBtn) { actionBtn.textContent = '🚀 启动自动模式'; actionBtn.disabled = false; }
                 addLog('⏹️ 已停止，修改课程后可重新开抢');
                 updateCountdown('⏹️ 已停止，可修改后重试');
                 return;
             }
 
+            // 情况2：已完成或未开始 → 重置并开抢
+            if (status.done) {
+                status.done = false; status.started = false; status.stopped = false;
+                status.courses = []; status.clicked = []; status.confirmed = [];
+                resetUI();
+                this.textContent = '🚀 立即开抢（手动）';
+                this.style.background = '#238FBF';
+            }
+
+            // 开始抢课
             const input = document.getElementById('hstc-course-input');
             const raw = input ? input.value.trim() : '';
             const courses = raw.split('\n').map(s => s.trim()).filter(s => s);
@@ -671,7 +657,6 @@
                 addLog('⚠️ 请先输入至少一个课程名称');
                 return;
             }
-
             this.textContent = '⏹ 停止';
             this.style.background = '#e74c3c';
             addLog('👆 用户手动触发抢课！');
