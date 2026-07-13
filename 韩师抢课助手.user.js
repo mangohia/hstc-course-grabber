@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      2.7
+// @version      2.8
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -357,9 +357,31 @@
                     addLog(`📄 已切换每页显示 ${max} 条，全部课程可见`);
                 }
             }
-        } catch (e) {
-            // 静默失败，不影响抢课
-        }
+        } catch (e) { /* 静默失败 */ }
+
+        // 检测分页，准备自动翻页
+        let pagPages = [];
+        let pagCurrentIdx = 0;
+        let pagAttemptsOnPage = 0;
+        try {
+            const allLinks = document.querySelectorAll('a, span');
+            const seenPages = new Set();
+            for (const el of allLinks) {
+                if (el.closest('table')) continue; // 跳过课程表格内的
+                const t = el.textContent.trim();
+                const n = parseInt(t);
+                if (!isNaN(n) && t === String(n) && n > 0 && n < 1000 && !seenPages.has(n)) {
+                    seenPages.add(n);
+                    pagPages.push({ element: el, page: n });
+                }
+            }
+            pagPages.sort((a, b) => a.page - b.page);
+            if (pagPages.length > 1) {
+                addLog(`📄 检测到 ${pagPages.length} 页分页（1-${pagPages[pagPages.length-1].page}），将自动翻页`);
+            }
+        } catch (e) { /* 静默失败 */ }
+        pagCurrentIdx = 0;
+        pagAttemptsOnPage = 0;
 
         addLog(`🚀 开始抢课！目标: ${status.courses.join(', ')}`);
 
@@ -434,6 +456,20 @@
                     setTimeout(switchToSelectedTab, 1000);
                 }
                 return;
+            }
+
+            // 自动翻页：当前页没找全，翻到下一页继续找
+            if (pagPages.length > 1 && !status.stopped) {
+                pagAttemptsOnPage++;
+                if (pagAttemptsOnPage >= 3 && pagCurrentIdx < pagPages.length - 1) {
+                    const nextIdx = pagCurrentIdx + 1;
+                    const nextPage = pagPages[nextIdx].page;
+                    addLog(`📄 翻到第 ${nextPage} 页继续查找...`);
+                    const el = pagPages[nextIdx].element;
+                    if (el && el.click) el.click();
+                    pagCurrentIdx = nextIdx;
+                    pagAttemptsOnPage = 0;
+                }
             }
 
             if (attempts < maxAttempts && !status.stopped) {
