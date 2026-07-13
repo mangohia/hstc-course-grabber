@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      2.9
+// @version      3.0
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -359,40 +359,27 @@
             }
         } catch (e) { /* 静默失败 */ }
 
-        // 检测分页，准备自动翻页
-        let pagPages = [];
-        let pagCurrentIdx = 0;
+        // 检测分页
+        let hasPagination = false;
         let pagAttemptsOnPage = 0;
         try {
-            // 优先找带 pageno 属性的链接（如 <a pageno="1">1</a>）
-            const pgLinks = document.querySelectorAll('a[pageno]');
-            const seenPages = new Set();
-            for (const el of pgLinks) {
-                const n = parseInt(el.getAttribute('pageno'));
-                if (n > 0 && n < 1000 && !seenPages.has(n)) {
-                    seenPages.add(n);
-                    pagPages.push({ element: el, page: n });
-                }
-            }
-            // 如果没找到 pageno，退回到找表格外的纯数字链接
-            if (pagPages.length === 0) {
-                const allLinks = document.querySelectorAll('a, span');
-                for (const el of allLinks) {
-                    if (el.closest('table')) continue;
-                    const t = el.textContent.trim();
-                    const n = parseInt(t);
-                    if (!isNaN(n) && t === String(n) && n > 0 && n < 1000 && !seenPages.has(n)) {
-                        seenPages.add(n);
-                        pagPages.push({ element: el, page: n });
+            // 检查有没有"下一页"按钮
+            for (const el of document.querySelectorAll('a, span')) {
+                const t = el.textContent.trim();
+                if (t === '下一页' || t === '>' || t === '»' || t === '下页') {
+                    if (!el.closest('table')) {
+                        hasPagination = true;
+                        addLog('📄 检测到分页，将自动翻页');
+                        break;
                     }
                 }
             }
-            pagPages.sort((a, b) => a.page - b.page);
-            if (pagPages.length > 1) {
-                addLog(`📄 检测到 ${pagPages.length} 页分页，将自动翻页`);
+            // 也检查 pageno 属性（备用）
+            if (!hasPagination && document.querySelectorAll('a[pageno]').length > 1) {
+                hasPagination = true;
+                addLog('📄 检测到分页，将自动翻页');
             }
         } catch (e) { /* 静默失败 */ }
-        pagCurrentIdx = 0;
         pagAttemptsOnPage = 0;
 
         addLog(`🚀 开始抢课！目标: ${status.courses.join(', ')}`);
@@ -470,17 +457,30 @@
                 return;
             }
 
-            // 自动翻页：当前页没找全，翻到下一页继续找
-            if (pagPages.length > 1 && !status.stopped) {
+            // 自动翻页：当前页没找全，点"下一页"
+            if (hasPagination && !status.stopped) {
                 pagAttemptsOnPage++;
-                if (pagAttemptsOnPage >= 3 && pagCurrentIdx < pagPages.length - 1) {
-                    const nextIdx = pagCurrentIdx + 1;
-                    const nextPage = pagPages[nextIdx].page;
-                    addLog(`📄 翻到第 ${nextPage} 页继续查找...`);
-                    const el = pagPages[nextIdx].element;
-                    if (el && el.click) el.click();
-                    pagCurrentIdx = nextIdx;
+                if (pagAttemptsOnPage >= 3) {
                     pagAttemptsOnPage = 0;
+                    // 每次重新查 DOM，避免 AJAX 后元素失效
+                    let clicked = false;
+                    for (const el of document.querySelectorAll('a, span, input, button')) {
+                        if (el.closest('table')) continue;
+                        const t = el.textContent.trim();
+                        if ((t === '下一页' || t === '>' || t === '»') && !el.disabled) {
+                            // 确保不是数字页码
+                            if (isNaN(parseInt(t))) {
+                                el.click();
+                                addLog('📄 翻到下一页继续查找...');
+                                clicked = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (!clicked) {
+                        hasPagination = false; // 没有下一页了
+                        addLog('📄 已翻到最后一页');
+                    }
                 }
             }
 
