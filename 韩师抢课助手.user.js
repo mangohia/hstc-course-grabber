@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      2.6
+// @version      2.7
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -343,6 +343,22 @@
             updateCountdown('⚠️ 未输入课程名');
             status.started = false;
             return;
+        }
+
+        // 尝试把每页显示调到最大，让所有课程出现在一页
+        try {
+            const pageSelect = document.querySelector('select[name="pageSize"], select[id*="pageSize"], select[id*="PageSize"]');
+            if (pageSelect) {
+                const nums = Array.from(pageSelect.options).map(o => parseInt(o.value)).filter(n => n > 0);
+                const max = Math.max(...nums, 0);
+                if (max > 0 && parseInt(pageSelect.value) < max) {
+                    pageSelect.value = max;
+                    pageSelect.dispatchEvent(new Event('change'));
+                    addLog(`📄 已切换每页显示 ${max} 条，全部课程可见`);
+                }
+            }
+        } catch (e) {
+            // 静默失败，不影响抢课
         }
 
         addLog(`🚀 开始抢课！目标: ${status.courses.join(', ')}`);
