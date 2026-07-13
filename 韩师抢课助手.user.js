@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      3.3
+// @version      3.4
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -383,6 +383,24 @@
         } catch (e) { /* 静默失败 */ }
         pagAttemptsOnPage = 0;
 
+        // 如果不在第1页，先跳回第1页再从前往后翻
+        let pagResetWait = 0;
+        if (hasPagination) {
+            try {
+                const p1 = document.querySelector('a[pageno="1"], a.pgFirst');
+                if (p1) {
+                    const isCurrent = p1.classList.contains('pgButtonHover') ||
+                                     p1.classList.contains('current') ||
+                                     p1.classList.contains('active');
+                    if (!isCurrent) {
+                        p1.click();
+                        pagResetWait = 1;
+                        addLog('📄 跳转到第1页开始扫描...');
+                    }
+                }
+            } catch (e) { /* 静默 */ }
+        }
+
         addLog(`🚀 开始抢课！目标: ${status.courses.join(', ')}`);
 
         // 隐藏输入区，显示课程状态
@@ -405,6 +423,18 @@
 
         function attemptGrab() {
             if (status.stopped) return;
+
+            // 等待跳转到第1页的 AJAX 加载完成
+            if (pagResetWait > 0) {
+                pagResetWait++;
+                if (pagResetWait < 4) {
+                    status.timer = setTimeout(attemptGrab, 500);
+                    return;
+                }
+                pagResetWait = 0;
+                addLog('📄 已回到第1页，开始逐页扫描');
+            }
+
             attempts++;
             addLog(`第 ${attempts} 次尝试...`);
 
