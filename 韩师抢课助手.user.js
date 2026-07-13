@@ -21,7 +21,7 @@
     const CONFIRM_WAIT = 1500;            // 点击选课后等弹窗的时间(ms)
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = (function() { try { return document.currentScript.textContent.match(/@version\s+(\S+)/)?.[1] || '3'; } catch(e) { return '3'; } })();
+    const SCRIPT_VER = '3.4';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
