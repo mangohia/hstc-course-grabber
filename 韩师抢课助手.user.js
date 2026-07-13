@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      2.2
+// @version      2.3
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://webvpn.hstc.edu.cn/*eams/stdElectCourse*
+// @match        *://*/*eams/*
 // @match        http://localhost:8888/*
 // @match        http://127.0.0.1:8888/*
 // @icon         https://www.hstc.edu.cn/favicon.ico
