@@ -189,7 +189,7 @@
                     width:100%;box-sizing:border-box;padding:6px 8px;
                     border:1px solid #ddd;border-radius:6px;font-size:13px;
                     resize:vertical;font-family:inherit;
-                " placeholder="舌尖上的潮州菜&#10;财经新闻与理财"></textarea>
+                " placeholder="舌尖上的潮州菜&#10;财经新闻与理财&#10;（输入课程名 或 课程序号均可）"></textarea>
             </div>
 
             <div id="hstc-course-status" style="margin-bottom:8px;display:none;"></div>
