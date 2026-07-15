@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      4.1
+// @version      4.2
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -23,7 +23,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '4.1';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '4.2';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -471,8 +471,8 @@
                 return;
             }
 
-            // 翻页：一直往前翻，到末页后跳回第1页重新扫
-            if (pagTotal > 1 && !status.stopped && !pagPendingNav) {
+            // 翻页：一直往前翻，到末页后跳回第1页重新扫（有未确认的点击时暂停翻页）
+            if (pagTotal > 1 && !status.stopped && !pagPendingNav && status.clicked.length === status.confirmed.length) {
                 pagWaitTicks++;
                 if (pagWaitTicks >= 1) {
                     pagWaitTicks = 0;
