@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.8.2
+// @version      5.8.3
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -36,7 +36,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.8.2';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.8.3';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -334,6 +334,9 @@
             status.clicked.pop();
             status.pendingConfirm = false;
             lastResultMsg = '';
+            // 轮到下一门课
+            nextCourseIndex = (index + 1) % status.courses.length;
+            foundPage = 0;
             // 关闭弹窗：优先 ColorBox close，其次确认按钮
             const cboxClose = document.getElementById('cboxClose');
             if (cboxClose) { cboxClose.click(); return; }
@@ -356,6 +359,7 @@
         if (status.confirmed.length < status.courses.length) {
             addLog(`📋 已完成 ${status.confirmed.length}/${status.courses.length}，继续抢下一门`);
             foundPage = 0;
+            nextCourseIndex = 0;
             status.clicked = [];
             return;
         }
@@ -456,7 +460,7 @@
         } catch (e) { /* 静默失败 */ }
 
         // 检测分页
-        let pagTotal = 0, pagTarget = 1, pagPendingNav = false, pagWaitTicks = 0, foundPage = 0;
+        let pagTotal = 0, pagTarget = 1, pagPendingNav = false, pagWaitTicks = 0, foundPage = 0, nextCourseIndex = 0;
         try {
             const allP = document.querySelectorAll('a[pageno]');
             for (const el of allP) {
@@ -520,9 +524,27 @@
             try {
                 const allBtns = findAllCourseButtons();
 
-                // 用 for 循环，每次只点一门课，防止"操作过快"
-                for (let ci = 0; ci < status.courses.length; ci++) {
-                    if (status.pendingConfirm) break; // 已点了一门，停
+                // 如果下一门课有记住的页码，直接跳过去
+                const nextIdx = nextCourseIndex;
+                if (nextIdx < status.courses.length && !status.confirmed.includes(nextIdx)) {
+                    const savedPage = status.coursePage[nextIdx];
+                    if (savedPage && savedPage !== pagTarget && pagTotal > 1) {
+                        const link = document.querySelector(`a[pageno="${savedPage}"]:not(.disabled)`);
+                        if (link) {
+                            link.click();
+                            pagPendingNav = true;
+                            pagTarget = savedPage;
+                            addLog(`📌 跳转到「${status.courses[nextIdx]}」所在第 ${savedPage} 页`);
+                            throw 'jump'; // 跳过扫描，进入下一轮
+                        }
+                    }
+                }
+
+                // 轮流扫描所有未确认的课程
+                const total = status.courses.length;
+                for (let offset = 0; offset < total; offset++) {
+                    if (status.pendingConfirm) break;
+                    const ci = (nextCourseIndex + offset) % total;
                     const courseName = status.courses[ci];
                     const index = ci;
                     if (status.confirmed.includes(index)) continue;
@@ -566,7 +588,7 @@
                     }
                 }
             } catch (e) {
-                addLog(`⚠️ 抢课循环异常: ${e.message}`);
+                if (e !== 'jump') addLog(`⚠️ 抢课循环异常: ${e.message}`);
             }
             } // end else (pendingConfirm skip-scan)
 
