@@ -362,7 +362,7 @@
         } catch (e) { /* 静默失败 */ }
 
         // 检测分页，准备自动翻页
-        let pagTotal = 0, pagGoingBack = true, pagPendingNav = false, pagWaitTicks = 0;
+        let pagTotal = 0, pagTarget = 1, pagGoingBack = true, pagPendingNav = false, pagWaitTicks = 0;
         try {
             const allP = document.querySelectorAll('a[pageno]');
             for (const el of allP) {
@@ -375,7 +375,7 @@
                 let curPage = 1;
                 if (curEl) {
                     const cn = parseInt(curEl.getAttribute('pageno') || curEl.textContent.trim());
-                    if (cn > 0) curPage = cn;
+                    if (cn > 0) { curPage = cn; pagTarget = cn; }
                 }
                 // 如果已经在第1页，直接向前翻；否则先往回翻
                 pagGoingBack = curPage > 1;
@@ -416,6 +416,8 @@
                 }
                 pagPendingNav = false;
                 pagWaitTicks = 0;
+                // 翻页后重新检测当前页
+                try { const pe = document.querySelector('a.pgButtonHover, a.current, a.active'); if (pe) { const pn = parseInt(pe.getAttribute('pageno') || pe.textContent.trim()); if (pn > 0) pagTarget = pn; } } catch {}
                 addLog(`📄 已到第 ${pagTarget} 页，开始扫描`);
             }
 
