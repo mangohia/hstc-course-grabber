@@ -553,7 +553,8 @@
                                 const pollTimer = setInterval(() => {
                                     if (status.stopped) { clearInterval(pollTimer); return; }
                                     const domBtn = document.querySelector('.modal-confirm-button');
-                                    if ((domBtn && domBtn.offsetParent !== null) || lastResultMsg) {
+                                    const cboxBtn = document.getElementById('cboxClose');
+                                    if ((domBtn && domBtn.offsetParent !== null) || cboxBtn || lastResultMsg) {
                                         clearInterval(pollTimer);
                                         // 等 400ms 让页面渲染稳定再处理弹窗
                                         setTimeout(() => handleConfirm(courseName, index), 400);
