@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      4.7
+// @version      4.8
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -16,6 +16,16 @@
 (function() {
     'use strict';
 
+    // 拦截浏览器原生弹窗，自动确认
+    window.confirm = function(msg) {
+        console.log(`[抢课助手] 自动确认 confirm: "${msg}"`);
+        return true;
+    };
+    window.alert = function(msg) {
+        console.log(`[抢课助手] 拦截 alert: "${msg}"`);
+        // alert 不阻塞，放行
+    };
+
     // ===== 配置区 =====
     const AUTO_CHECK = true;              // 抢完后自动切到「已选课程」标签
     const CONFIRM_WAIT = 1500;            // 点击选课后等弹窗的时间(ms)
@@ -23,7 +33,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '4.7';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '4.8';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -291,16 +301,13 @@
 
     function handleConfirm(courseName, index, retryCount) {
         if (retryCount === undefined) retryCount = 0;
-        // 找可见弹窗（使用多种方式）
         const dialog = findVisibleDialog();
         if (!dialog) {
             if (retryCount < 3) {
-                // 可能弹窗还没渲染完，再等等
-                setTimeout(() => handleConfirm(courseName, index, retryCount + 1), 1000);
+                setTimeout(() => handleConfirm(courseName, index, retryCount + 1), 800);
                 return;
             }
-            // 重试 3 次都找不到弹窗 → 可能直接成功或没有弹窗类
-            addLog(`⚠️ 「${courseName}」未检测到弹窗（可能已成功，或弹窗CSS类不匹配）`);
+            addLog(`⚠️ 「${courseName}」未检测到结果弹窗`);
             updateCourseStatus(index, '⚠️ 请手动检查', '#f90');
             status.clicked.pop();
             status.pendingConfirm = false;
@@ -309,23 +316,7 @@
 
         const text = dialog.textContent || '';
 
-        // 第 1 步：是否提交？
-        if (text.includes('是否提交')) {
-            const btn = findBtn(dialog, ['确定', '确认']);
-            if (btn) {
-                btn.click();
-                addLog(`📋 「${courseName}」已提交，等待选课结果...`);
-                updateCourseStatus(index, '⏳ 等待结果...', '#f90');
-                // 2 秒后检查结果弹窗
-                setTimeout(() => handleConfirm(courseName, index), 2000);
-            } else {
-                addLog(`⚠️ 「${courseName}」找不到确定按钮`);
-                status.clicked.pop();
-            }
-            return;
-        }
-
-        // 第 2 步：操作结果
+        // 判断结果：失败 or 成功
         const isFail = text.includes('失败') || text.includes('满') || text.includes('冲突') || text.includes('请稍后再试');
         if (isFail) {
             const reason = text.includes('满') ? '人数已满'
@@ -335,24 +326,21 @@
             addLog(`❌ 「${courseName}」${reason}，关闭弹窗继续`);
             updateCourseStatus(index, `❌ ${reason}`, '#e74c3c');
             status.clicked.pop();
-            status.pendingConfirm = false; // 恢复扫描，立即在当前页重试
+            status.pendingConfirm = false;
             const closeBtn = findBtn(dialog, ['确定', '确认', '关闭']);
             if (closeBtn) closeBtn.click();
             return;
         }
 
-        // 没有失败关键词 → 视为成功
-        if (text.includes('成功') || !text.includes('失败')) {
-            addLog(`✅ 「${courseName}」抢课成功！`);
-            updateCourseStatus(index, '✅ 已抢到！', '#0a0');
-            status.confirmed.push(index);
-            status.stopped = true;
-            status.pendingConfirm = false;
-            if (status.timer) { clearTimeout(status.timer); status.timer = null; }
-            const closeBtn = findBtn(dialog, ['确定', '确认', '关闭']);
-            if (closeBtn) closeBtn.click();
-            return;
-        }
+        // 成功
+        addLog(`✅ 「${courseName}」抢课成功！`);
+        updateCourseStatus(index, '✅ 已抢到！', '#0a0');
+        status.confirmed.push(index);
+        status.stopped = true;
+        status.pendingConfirm = false;
+        if (status.timer) { clearTimeout(status.timer); status.timer = null; }
+        const closeBtn = findBtn(dialog, ['确定', '确认', '关闭']);
+        if (closeBtn) closeBtn.click();
     }
 
     function findVisibleDialog() {
