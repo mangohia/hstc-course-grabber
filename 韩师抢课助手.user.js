@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      4.8
+// @version      4.9
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -16,15 +16,15 @@
 (function() {
     'use strict';
 
-    // 拦截浏览器原生弹窗，自动确认
-    window.confirm = function(msg) {
-        console.log(`[抢课助手] 自动确认 confirm: "${msg}"`);
-        return true;
-    };
-    window.alert = function(msg) {
-        console.log(`[抢课助手] 拦截 alert: "${msg}"`);
-        // alert 不阻塞，放行
-    };
+    // 保存原生 confirm，抢课时临时接管
+    const origConfirm = window.confirm;
+
+    function enableGrabDialogs() {
+        window.confirm = function(msg) { return true; };
+    }
+    function disableGrabDialogs() {
+        window.confirm = origConfirm;
+    }
 
     // ===== 配置区 =====
     const AUTO_CHECK = true;              // 抢完后自动切到「已选课程」标签
@@ -33,7 +33,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '4.8';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '4.9';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -336,6 +336,7 @@
         addLog(`✅ 「${courseName}」抢课成功！`);
         updateCourseStatus(index, '✅ 已抢到！', '#0a0');
         status.confirmed.push(index);
+        disableGrabDialogs();
         status.stopped = true;
         status.pendingConfirm = false;
         if (status.timer) { clearTimeout(status.timer); status.timer = null; }
@@ -378,6 +379,7 @@
 
     function startGrabbing(courses) {
         if (status.started) return;
+        enableGrabDialogs(); // 抢课期间拦截原生弹窗
         status.started = true;
         status.stopped = false;
         status.courses = courses || [];
