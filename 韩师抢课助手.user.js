@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.3
+// @version      5.4
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -28,12 +28,11 @@
 
     // ===== 配置区 =====
     const AUTO_CHECK = true;              // 抢完后自动切到「已选课程」标签
-    const CONFIRM_WAIT = 1500;            // 点击选课后等弹窗的时间(ms)
     const SCAN_INTERVAL = 300;            // 每次扫描间隔(ms)
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.3';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.4';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -501,10 +500,14 @@
                                 btnInfo.element.click();
                                 status.clicked.push(index);
                                 status.pendingConfirm = true; // 暂停扫描，等弹窗处理完
-                                // 等待弹窗并自动处理
-                                setTimeout(() => {
-                                    handleConfirm(courseName, index);
-                                }, CONFIRM_WAIT);
+                                // 轮询检测弹窗，一出现立即处理
+                                const pollTimer = setInterval(() => {
+                                    if (status.stopped) { clearInterval(pollTimer); return; }
+                                    if (findVisibleDialog()) {
+                                        clearInterval(pollTimer);
+                                        handleConfirm(courseName, index);
+                                    }
+                                }, 200);
                             }
                             break;
                         }
