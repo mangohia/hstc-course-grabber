@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      4.6
+// @version      4.7
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -23,7 +23,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '4.6';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '4.7';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -31,6 +31,7 @@
         clicked: [],
         confirmed: [],
         coursePage: {}, // index → 页码，失败后跳回重试
+        pendingConfirm: false, // 弹窗处理中，暂停扫描
         started: false,
         stopped: false,
         timer: null,
@@ -301,7 +302,8 @@
             // 重试 3 次都找不到弹窗 → 可能直接成功或没有弹窗类
             addLog(`⚠️ 「${courseName}」未检测到弹窗（可能已成功，或弹窗CSS类不匹配）`);
             updateCourseStatus(index, '⚠️ 请手动检查', '#f90');
-            status.clicked.pop(); // 恢复，让用户重新触发
+            status.clicked.pop();
+            status.pendingConfirm = false;
             return;
         }
 
@@ -333,12 +335,7 @@
             addLog(`❌ 「${courseName}」${reason}，关闭弹窗继续`);
             updateCourseStatus(index, `❌ ${reason}`, '#e74c3c');
             status.clicked.pop();
-            // 跳回该课程所在页面，立即重试
-            const coursePage = status.coursePage[index];
-            if (coursePage && coursePage > 1) {
-                pagTarget = coursePage - 1; // 设成前一页，下一页就会跳回去
-                addLog(`📌 记住「${courseName}」在第 ${coursePage} 页，准备跳回重试`);
-            }
+            status.pendingConfirm = false; // 恢复扫描，立即在当前页重试
             const closeBtn = findBtn(dialog, ['确定', '确认', '关闭']);
             if (closeBtn) closeBtn.click();
             return;
@@ -350,6 +347,7 @@
             updateCourseStatus(index, '✅ 已抢到！', '#0a0');
             status.confirmed.push(index);
             status.stopped = true;
+            status.pendingConfirm = false;
             if (status.timer) { clearTimeout(status.timer); status.timer = null; }
             const closeBtn = findBtn(dialog, ['确定', '确认', '关闭']);
             if (closeBtn) closeBtn.click();
@@ -475,6 +473,10 @@
             attempts++;
             addLog(`第 ${attempts} 次尝试...`);
 
+            // 有弹窗等待处理时跳过扫描
+            if (status.pendingConfirm) {
+                // 直接跳到翻页/定时器，不扫描
+            } else {
             try {
                 const allBtns = findAllCourseButtons();
 
@@ -494,6 +496,7 @@
                                 status.coursePage[index] = pagTarget;
                                 btnInfo.element.click();
                                 status.clicked.push(index);
+                                status.pendingConfirm = true; // 暂停扫描，等弹窗处理完
                                 // 等待弹窗并自动处理
                                 setTimeout(() => {
                                     handleConfirm(courseName, index);
@@ -510,6 +513,7 @@
             } catch (e) {
                 addLog(`⚠️ 抢课循环异常: ${e.message}`);
             }
+            } // end else (pendingConfirm skip-scan)
 
             // 检查是否全部完成
             if (status.confirmed.length === status.courses.length) {
