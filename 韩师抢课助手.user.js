@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      4.0
+// @version      4.1
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -19,9 +19,11 @@
     // ===== 配置区 =====
     const AUTO_CHECK = true;              // 抢完后自动切到「已选课程」标签
     const CONFIRM_WAIT = 1500;            // 点击选课后等弹窗的时间(ms)
+    const SCAN_INTERVAL = 300;            // 每次扫描间隔(ms)
+    const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '4.0';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '4.1';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -405,8 +407,8 @@
             try {
             if (pagPendingNav) {
                 pagWaitTicks++;
-                if (pagWaitTicks < 3) {
-                    status.timer = setTimeout(attemptGrab, 500);
+                if (pagWaitTicks < AJAX_WAIT_TICKS) {
+                    status.timer = setTimeout(attemptGrab, SCAN_INTERVAL);
                     return;
                 }
                 pagPendingNav = false;
@@ -522,7 +524,7 @@
             }
 
             if (attempts < maxAttempts && !status.stopped) {
-                status.timer = setTimeout(attemptGrab, 500);
+                status.timer = setTimeout(attemptGrab, SCAN_INTERVAL);
             } else if (!status.stopped) {
                 addLog('⏰ 尝试次数已达上限，请手动操作');
                 updateCountdown('⚠️ 请手动操作');
@@ -535,7 +537,7 @@
             addLog(`❌ attemptGrab 异常: ${e.message}`);
             // 错误后继续循环，不卡死
             if (!status.stopped && attempts < maxAttempts) {
-                status.timer = setTimeout(attemptGrab, 500);
+                status.timer = setTimeout(attemptGrab, SCAN_INTERVAL);
             }
         }
         }
