@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      3.8
+// @version      3.9
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -21,7 +21,7 @@
     const CONFIRM_WAIT = 1500;            // 点击选课后等弹窗的时间(ms)
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '3.8';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '3.9';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -474,58 +474,61 @@
                 return;
             }
 
-            // 翻页：用 a[pageno] 跳页（比搜"上一页""下一页"文本更可靠）
+            // 翻页：用 a[pageno] 跳页（不依赖 DOM 读当前页，用 pagTarget 自己跟踪）
             if (pagTotal > 1 && !status.stopped && !pagPendingNav) {
                 pagWaitTicks++;
                 if (pagWaitTicks >= 1) {
                     pagWaitTicks = 0;
                     let targetPage = null;
-                    // 获取当前页码
-                    let curPage = 0;
-                    try {
-                        const curEl = document.querySelector('a.pgButtonHover, a.current, a.active');
-                        if (curEl) curPage = parseInt(curEl.getAttribute('pageno') || curEl.textContent.trim()) || 0;
-                    } catch {}
+
                     if (pagGoingBack) {
-                        // 优先尝试直接跳第1页
-                        const pageOneLink = document.querySelector('a[pageno="1"]:not(.disabled)');
-                        if (pageOneLink) {
+                        // 优先直接跳第1页
+                        const p1 = document.querySelector('a[pageno="1"]:not(.disabled)');
+                        if (p1) {
                             targetPage = 1;
-                            pagGoingBack = false; // 跳完就直接改向前翻
+                            pagGoingBack = false;
                             addLog('📄 直接跳到第1页');
                         } else {
-                            // 第1页不在DOM里 → 找小于当前页的最大可见页码（逐步往回翻）
+                            // 找小于 pagTarget 的最大可见页码
                             try {
                                 const allLinks = document.querySelectorAll('a[pageno]:not(.disabled)');
                                 for (const el of allLinks) {
                                     const n = parseInt(el.getAttribute('pageno'));
-                                    if (n > 0 && n < (curPage || pagTotal) && (targetPage === null || n > targetPage)) {
+                                    if (n > 0 && n < pagTarget && (targetPage === null || n > targetPage)) {
                                         targetPage = n;
                                     }
                                 }
                             } catch {}
                             if (targetPage === null) {
-                                // 没有更小的页码了 → 已在第1页
                                 pagGoingBack = false;
                                 addLog('📄 已在第1页，开始向前翻');
                             }
                         }
                     } else {
-                        // 向前翻：当前页 + 1
-                        if (curPage > 0) targetPage = curPage + 1;
+                        // 向前翻：找大于 pagTarget 的最小可见页码
+                        try {
+                            const allLinks = document.querySelectorAll('a[pageno]:not(.disabled)');
+                            for (const el of allLinks) {
+                                const n = parseInt(el.getAttribute('pageno'));
+                                if (n > 0 && n > pagTarget && (targetPage === null || n < targetPage)) {
+                                    targetPage = n;
+                                }
+                            }
+                        } catch {}
+                        if (targetPage === null) {
+                            pagTotal = 0;
+                            addLog('📄 已扫描完所有页面');
+                        }
                     }
+
                     if (targetPage !== null && targetPage <= pagTotal) {
                         const link = document.querySelector(`a[pageno="${targetPage}"]`);
                         if (link && !link.disabled && !link.classList.contains('disabled')) {
                             link.click();
                             pagPendingNav = true;
-                            if (targetPage <= curPage) {
-                                addLog(`📄 跳到第 ${targetPage} 页（往回）`);
-                            } else {
-                                addLog(`📄 跳到第 ${targetPage} 页`);
-                            }
+                            pagTarget = targetPage; // 立即更新，不等 AJAX
+                            addLog(`📄 跳到第 ${targetPage} 页`);
                         } else {
-                            // 目标页链接不可用
                             if (pagGoingBack) {
                                 pagGoingBack = false;
                                 addLog('📄 无法往回跳，开始向前翻');
