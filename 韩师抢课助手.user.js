@@ -474,53 +474,57 @@
                 return;
             }
 
-            // 翻页：用 a[pageno] 直接跳页（比搜"上一页""下一页"文本更可靠）
+            // 翻页：用 a[pageno] 跳页（比搜"上一页""下一页"文本更可靠）
             if (pagTotal > 1 && !status.stopped && !pagPendingNav) {
                 pagWaitTicks++;
                 if (pagWaitTicks >= 1) {
                     pagWaitTicks = 0;
                     let targetPage = null;
+                    // 获取当前页码
+                    let curPage = 0;
+                    try {
+                        const curEl = document.querySelector('a.pgButtonHover, a.current, a.active');
+                        if (curEl) curPage = parseInt(curEl.getAttribute('pageno') || curEl.textContent.trim()) || 0;
+                    } catch {}
                     if (pagGoingBack) {
-                        targetPage = 1; // 直接跳到第1页
-                    } else {
-                        // 获取当前页 → 翻下一页
+                        // 找小于当前页的最大可见页码（逐步往回翻）
                         try {
-                            const curEl = document.querySelector('a.pgButtonHover, a.current, a.active');
-                            if (curEl) {
-                                const cn = parseInt(curEl.getAttribute('pageno') || curEl.textContent.trim());
-                                if (cn > 0) targetPage = cn + 1;
+                            const allLinks = document.querySelectorAll('a[pageno]:not(.disabled)');
+                            for (const el of allLinks) {
+                                const n = parseInt(el.getAttribute('pageno'));
+                                if (n > 0 && n < (curPage || pagTotal) && (targetPage === null || n > targetPage)) {
+                                    targetPage = n;
+                                }
                             }
                         } catch {}
+                        if (targetPage === null) {
+                            // 没有更小的页码了 → 已在第1页
+                            pagGoingBack = false;
+                            addLog('📄 已在第1页，开始向前翻');
+                        }
+                    } else {
+                        // 向前翻：当前页 + 1
+                        if (curPage > 0) targetPage = curPage + 1;
                     }
                     if (targetPage !== null && targetPage <= pagTotal) {
                         const link = document.querySelector(`a[pageno="${targetPage}"]`);
                         if (link && !link.disabled && !link.classList.contains('disabled')) {
                             link.click();
                             pagPendingNav = true;
-                            if (pagGoingBack) {
-                                pagGoingBack = false; // 跳第1页后改向前翻
-                                addLog('📄 跳到第1页，准备向前扫描');
+                            if (targetPage <= curPage) {
+                                addLog(`📄 跳到第 ${targetPage} 页（往回）`);
                             } else {
                                 addLog(`📄 跳到第 ${targetPage} 页`);
                             }
                         } else {
-                            // 目标页链接不可用（翻完了）
+                            // 目标页链接不可用
                             if (pagGoingBack) {
                                 pagGoingBack = false;
-                                addLog('📄 已在第1页，开始向前翻');
+                                addLog('📄 无法往回跳，开始向前翻');
                             } else {
                                 pagTotal = 0;
                                 addLog('📄 已扫描完所有页面');
                             }
-                        }
-                    } else {
-                        // 无有效目标页
-                        if (pagGoingBack) {
-                            pagGoingBack = false;
-                            addLog('📄 已在第1页，开始向前翻');
-                        } else {
-                            pagTotal = 0;
-                            addLog('📄 已扫描完所有页面');
                         }
                     }
                 }
