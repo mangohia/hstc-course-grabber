@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.4
+// @version      5.5
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -16,14 +16,18 @@
 (function() {
     'use strict';
 
-    // 保存原生 confirm，抢课时临时接管
+    // 保存原生弹窗函数，抢课时临时接管
     const origConfirm = window.confirm;
+    const origAlert = window.alert;
+    let lastResultMsg = '';
 
     function enableGrabDialogs() {
         window.confirm = function(msg) { return true; };
+        window.alert = function(msg) { lastResultMsg = msg; }; // 拦截 alert，捕获结果
     }
     function disableGrabDialogs() {
         window.confirm = origConfirm;
+        window.alert = origAlert;
     }
 
     // ===== 配置区 =====
@@ -32,7 +36,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.4';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.5';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -298,22 +302,21 @@
         }
     }
 
-    function handleConfirm(courseName, index, retryCount) {
-        if (retryCount === undefined) retryCount = 0;
-        const dialog = findVisibleDialog();
-        if (!dialog) {
-            if (retryCount < 3) {
-                setTimeout(() => handleConfirm(courseName, index, retryCount + 1), 800);
-                return;
-            }
-            addLog(`⚠️ 「${courseName}」未检测到结果弹窗`);
+    function handleConfirm(courseName, index) {
+        // 优先用 alert 捕获的结果文字（原生弹窗），其次用 DOM 弹窗
+        const text = lastResultMsg || (() => {
+            const btn = document.querySelector('.modal-confirm-button');
+            const d = btn ? (btn.closest('div[class], form') || btn.parentElement) : null;
+            return d ? d.textContent || '' : '';
+        })();
+
+        if (!text) {
+            addLog(`⚠️ 「${courseName}」未检测到结果`);
             updateCourseStatus(index, '⚠️ 请手动检查', '#f90');
             status.clicked.pop();
             status.pendingConfirm = false;
             return;
         }
-
-        const text = dialog.textContent || '';
 
         // 判断结果：失败 or 成功
         const isFail = text.includes('失败') || text.includes('满') || text.includes('冲突') || text.includes('请稍后再试');
@@ -322,20 +325,11 @@
                          : text.includes('冲突') ? '时间冲突'
                          : text.includes('请稍后再试') ? '人数已满，请稍后再试'
                          : '选课失败';
-            addLog(`❌ 「${courseName}」${reason}，关闭弹窗继续`);
+            addLog(`❌ 「${courseName}」${reason}，继续尝试`);
             updateCourseStatus(index, `❌ ${reason}`, '#e74c3c');
             status.clicked.pop();
             status.pendingConfirm = false;
-            // 关闭弹窗（多种方式确保关掉）
-            const closeBtn = document.querySelector('.modal-confirm-button, button:not(:disabled)');
-            if (closeBtn && closeBtn.textContent.includes('确定')) {
-                closeBtn.click();
-                addLog(`🔘 已关闭弹窗`);
-            } else {
-                // 兜底：弹窗里的任意按钮都点
-                const anyBtn = dialog.querySelector('a, button, span');
-                if (anyBtn) anyBtn.click();
-            }
+            lastResultMsg = ''; // 清除，准备下一次
             return;
         }
 
@@ -348,7 +342,6 @@
         status.pendingConfirm = false;
         if (status.timer) { clearTimeout(status.timer); status.timer = null; }
     }
-
     function findVisibleDialog() {
         // 常见弹窗 CSS 类
         const selectors = [
@@ -500,10 +493,11 @@
                                 btnInfo.element.click();
                                 status.clicked.push(index);
                                 status.pendingConfirm = true; // 暂停扫描，等弹窗处理完
-                                // 轮询检测弹窗，一出现立即处理
+                                // 轮询检测弹窗结果（DOM弹窗或原生alert）
                                 const pollTimer = setInterval(() => {
                                     if (status.stopped) { clearInterval(pollTimer); return; }
-                                    if (findVisibleDialog()) {
+                                    const domBtn = document.querySelector('.modal-confirm-button');
+                                    if ((domBtn && domBtn.offsetParent !== null) || lastResultMsg) {
                                         clearInterval(pollTimer);
                                         handleConfirm(courseName, index);
                                     }
