@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.6
+// @version      5.7
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -36,7 +36,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.6';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.7';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -338,15 +338,29 @@
         updateCourseStatus(index, '✅ 已抢到！', '#0a0');
         status.confirmed.push(index);
         disableGrabDialogs();
+        status.pendingConfirm = false;
+        if (status.timer) { clearTimeout(status.timer); status.timer = null; }
+
+        // 还有未完成的课程 → 继续抢下一门
+        if (status.confirmed.length < status.courses.length) {
+            addLog(`📋 已完成 ${status.confirmed.length}/${status.courses.length}，继续抢下一门`);
+            foundPage = 0; // 重置锁定，重新扫描所有页
+            status.clicked = []; // 清空点击记录，允许点新课
+            // 继续扫描循环
+            if (!status.stopped) {
+                status.timer = setTimeout(attemptGrab, SCAN_INTERVAL);
+            }
+            return;
+        }
+
+        // 全部完成
         status.stopped = true;
         status.started = false;
         status.done = true;
-        status.pendingConfirm = false;
-        if (status.timer) { clearTimeout(status.timer); status.timer = null; }
-        // 恢复按钮，方便继续抢别的课
+        addLog('🎉 全部课程已抢到！');
+        updateCountdown('✅ 全部完成！');
         const manualBtn = document.getElementById('hstc-manual-start');
-        if (manualBtn) { manualBtn.textContent = '⚡ 继续抢课'; manualBtn.style.background = '#e67e22'; manualBtn.disabled = false; }
-        // 自动切到已选课程查看（可选）
+        if (manualBtn) { manualBtn.textContent = '🔄 重新开抢'; manualBtn.style.background = '#238FBF'; manualBtn.disabled = false; }
         if (AUTO_CHECK) {
             setTimeout(switchToSelectedTab, 1000);
         }
@@ -403,16 +417,21 @@
         }
 
         // 切回可选课程标签（如果当前在"已选课程"等别的标签）
+        let switchedTab = false;
         try {
             for (const el of document.querySelectorAll('a, span, div')) {
                 const txt = el.textContent.trim();
                 if (txt.includes('可选课程') || txt.includes('选课管理') || txt.includes('网上选课')) {
                     el.click();
+                    switchedTab = true;
                     addLog(`📋 已切换到「${txt}」`);
                     break;
                 }
             }
         } catch {}
+
+        // 切标签后等 1 秒让页面加载，否则直接继续
+        const doSetup = function() {
 
         // 尝试把每页显示调到最大，让所有课程出现在一页
         try {
@@ -493,8 +512,12 @@
             try {
                 const allBtns = findAllCourseButtons();
 
-                status.courses.forEach((courseName, index) => {
-                    if (status.confirmed.includes(index)) return;
+                // 用 for 循环，每次只点一门课，防止"操作过快"
+                for (let ci = 0; ci < status.courses.length; ci++) {
+                    if (status.pendingConfirm) break; // 已点了一门，停
+                    const courseName = status.courses[ci];
+                    const index = ci;
+                    if (status.confirmed.includes(index)) continue;
 
                     let found = false;
                     for (const btnInfo of allBtns) {
@@ -532,7 +555,7 @@
                     if (!found && !status.clicked.includes(index)) {
                         updateCourseStatus(index, '🔍 未出现', '#999');
                     }
-                });
+                }
             } catch (e) {
                 addLog(`⚠️ 抢课循环异常: ${e.message}`);
             }
@@ -616,9 +639,16 @@
                 status.timer = setTimeout(attemptGrab, SCAN_INTERVAL);
             }
         }
-        }
+        } // end attemptGrab
+            attemptGrab(); // 启动抢课循环
+        } // end doSetup
 
-        attemptGrab();
+        if (switchedTab) {
+            addLog('⏳ 等待课程列表加载...');
+            setTimeout(doSetup, 1200);
+        } else {
+            doSetup();
+        }
     }
 
     // ========================
