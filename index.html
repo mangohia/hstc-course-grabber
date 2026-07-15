@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>韩师抢课助手 — 使用指南</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --primary: #2563eb;
+    --primary-hover: #1d4ed8;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text: #0f172a;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --success: #16a34a;
+    --warning: #d97706;
+    --radius: 12px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+
+  /* Hero */
+  .hero {
+    background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+    color: white;
+    padding: 64px 24px 48px;
+    text-align: center;
+  }
+  .hero h1 { font-size: 2.4rem; font-weight: 800; margin-bottom: 8px; }
+  .hero .emoji { font-size: 3rem; margin-bottom: 12px; }
+  .hero p { font-size: 1.1rem; opacity: .9; max-width: 500px; margin: 0 auto; }
+  .hero .version {
+    display: inline-block;
+    background: rgba(255,255,255,.15);
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: .85rem;
+    margin-top: 12px;
+  }
+
+  .container { max-width: 800px; margin: 0 auto; padding: 0 20px; }
+
+  /* Sections */
+  section { padding: 40px 0; }
+  section + section { border-top: 1px solid var(--border); }
+  h2 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Feature Grid */
+  .features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  @media (max-width: 600px) { .features { grid-template-columns: 1fr; } }
+  .feature {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    font-size: .95rem;
+  }
+  .feature .check { color: var(--success); font-weight: 700; }
+
+  /* Steps */
+  .steps { counter-reset: step; }
+  .step {
+    counter-increment: step;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 20px 20px 60px;
+    position: relative;
+    margin-bottom: 12px;
+  }
+  .step::before {
+    content: counter(step);
+    position: absolute;
+    left: 16px;
+    top: 18px;
+    width: 30px;
+    height: 30px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: .9rem;
+  }
+  .step strong { display: block; margin-bottom: 4px; }
+  .step p { color: var(--muted); font-size: .9rem; }
+
+  /* Quick start */
+  .terminal {
+    background: #1e293b;
+    color: #e2e8f0;
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: .9rem;
+    line-height: 1.8;
+    overflow-x: auto;
+  }
+  .terminal .arrow { color: #22d3ee; }
+  .terminal .highlight { color: #fbbf24; }
+
+  /* Tips */
+  .tip {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 12px;
+    font-size: .95rem;
+  }
+  .tip .label {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    font-size: .75rem;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+  }
+  .tip code {
+    background: rgba(37,99,235,.1);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: .85rem;
+  }
+
+  /* FAQ */
+  .faq-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 10px;
+  }
+  .faq-q {
+    padding: 14px 20px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    user-select: none;
+  }
+  .faq-q::after {
+    content: '+';
+    font-size: 1.3rem;
+    color: var(--muted);
+    transition: transform .2s;
+  }
+  .faq-item.open .faq-q::after { content: '−'; }
+  .faq-a {
+    padding: 0 20px 14px;
+    color: var(--muted);
+    font-size: .92rem;
+    display: none;
+  }
+  .faq-item.open .faq-a { display: block; }
+  .faq-a code {
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: .85rem;
+  }
+
+  /* Install buttons */
+  .install-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .btn-install {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    padding: 12px 32px;
+    border-radius: 50px;
+    font-size: 1.05rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background .2s;
+    margin-bottom: 12px;
+  }
+  .btn-install:hover { background: var(--primary-hover); }
+
+  /* Browser table */
+  .browser-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .92rem;
+  }
+  .browser-table th, .browser-table td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+  .browser-table th { background: #f1f5f9; font-weight: 600; }
+  .browser-table a { color: var(--primary); text-decoration: none; }
+  .browser-table a:hover { text-decoration: underline; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 32px 20px;
+    color: var(--muted);
+    font-size: .85rem;
+  }
+  footer a { color: var(--primary); text-decoration: none; }
+  footer .star { color: #eab308; }
+
+  /* Warning box */
+  .warning {
+    background: #fef3c7;
+    border: 1px solid #fcd34d;
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    font-size: .9rem;
+    margin-bottom: 12px;
+  }
+  .warning strong { color: #92400e; }
+
+  @media (max-width: 600px) {
+    .hero h1 { font-size: 1.6rem; }
+    .hero p { font-size: .95rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="emoji">🎯</div>
+  <h1>韩师抢课助手</h1>
+  <p>每次只抢一门课，抢到停，抢不到继续试</p>
+  <span class="version">v5.8 · 韩山师范学院选修课自动抢课</span>
+</div>
+
+<div class="container">
+
+<!-- 30秒学会 -->
+<section>
+  <h2>🚀 30 秒学会</h2>
+  <div class="terminal">
+    <span class="arrow">→</span> 装好脚本，打开教务系统选课页面<br>
+    <span class="arrow">→</span> 右上角出现 <span class="highlight">蓝色面板</span><br>
+    <span class="arrow">→</span> 输入课程名（每次只输 <span class="highlight">一门</span>）<br>
+    <span class="arrow">→</span> 点「⚡ 立即开抢」<br>
+    <span class="arrow">→</span> 等着，抢到了 <span class="highlight">自动停</span><br>
+    <span class="arrow">→</span> 点「🔄 继续抢课」换下一门
+  </div>
+</section>
+
+<!-- 能干什么 -->
+<section>
+  <h2>✨ 能干什么</h2>
+  <div class="features">
+    <div class="feature"><span class="check">✅</span> <strong>输入课程名就能搜</strong><br>关键词就行，不用打全名</div>
+    <div class="feature"><span class="check">✅</span> <strong>自动翻遍所有页</strong><br>一页一页翻，不落下</div>
+    <div class="feature"><span class="check">✅</span> <strong>自动点击「选课」</strong><br>找到就自动点，不用动手</div>
+    <div class="feature"><span class="check">✅</span> <strong>自动处理结果弹窗</strong><br>人数已满自动继续，成功自动停</div>
+    <div class="feature"><span class="check">✅</span> <strong>页面刷新保活</strong><br>自动模式定期刷新防掉线</div>
+    <div class="feature"><span class="check">✅</span> <strong>到点自动开抢</strong><br>设好时间，到点自动启动</div>
+    <div class="feature"><span class="check">✅</span> <strong>无限重试</strong><br>不设上限，直到抢到或手动停</div>
+    <div class="feature"><span class="check">✅</span> <strong>面板可拖动</strong><br>拖到不挡视线的地方</div>
+  </div>
+</section>
+
+<!-- 安装 -->
+<section>
+  <h2>📥 安装方法</h2>
+
+  <h3 style="font-size:1.1rem;margin-bottom:12px;">1️⃣ 装 Tampermonkey</h3>
+  <table class="browser-table">
+    <tr><th>浏览器</th><th>安装地址</th></tr>
+    <tr><td>Chrome</td><td><a href="https://www.tampermonkey.net/index.php?browser=chrome" target="_blank">tampermonkey.net</a></td></tr>
+    <tr><td>Edge</td><td><a href="https://www.tampermonkey.net/index.php?browser=edge" target="_blank">tampermonkey.net</a></td></tr>
+    <tr><td>360 / QQ 浏览器</td><td>跟 Chrome 一样，用上面的链接</td></tr>
+  </table>
+
+  <div class="warning">
+    <strong>⚠️ 安装后必做这一步！</strong><br>
+    ① 点右上角 🧩 拼图图标 → 管理扩展程序<br>
+    ② 找到 Tampermonkey → 点「详情」<br>
+    ③ 往下翻 → 打开「允许访问文件网址」开关<br>
+    ❌ 不打开，脚本不会运行！
+  </div>
+
+  <h3 style="font-size:1.1rem;margin:16px 0 12px;">2️⃣ 装抢课脚本</h3>
+  <div class="install-card">
+    <a class="btn-install" href="https://gitee.com/mangohia/hstc-course-grabber/raw/main/%E9%9F%A9%E5%B8%88%E6%8A%A2%E8%AF%BE%E5%8A%A9%E6%89%8B.user.js" target="_blank">📦 一键安装</a>
+    <p style="color:var(--muted);font-size:.88rem;">点上面的链接 → 浏览器弹出安装页面 → 点「安装」→ 完成！</p>
+  </div>
+
+  <details style="margin-bottom:16px;">
+    <summary style="cursor:pointer;color:var(--primary);font-size:.92rem;padding:8px 0;">手动安装教程（一键安装没反应时）</summary>
+    <div class="terminal" style="margin-top:8px;">
+      <span class="arrow">①</span> 右键上方「一键安装」→ 另存为 → 保存到桌面<br>
+      <span class="arrow">②</span> 点 🐒 图标 → 管理面板<br>
+      <span class="arrow">③</span> 点「➕ 添加新脚本」<br>
+      <span class="arrow">④</span> 删掉默认代码<br>
+      <span class="arrow">⑤</span> 用记事本打开下载的文件 → Ctrl+A → Ctrl+C<br>
+      <span class="arrow">⑥</span> 粘贴到浏览器 → Ctrl+V<br>
+      <span class="arrow">⑦</span> <span class="highlight">Ctrl+S</span> 保存
+    </div>
+  </details>
+
+  <h3 style="font-size:1.1rem;margin:16px 0 12px;">3️⃣ 开抢！</h3>
+  <div class="terminal">
+    <span class="arrow">→</span> 打开教务系统 → 登录<br>
+    <span class="arrow">→</span> 进入选课页面（URL 含 <span class="highlight">eams/stdElectCourse</span>）<br>
+    <span class="arrow">→</span> 右上角出现 <span class="highlight">蓝色面板</span><br>
+    <span class="arrow">→</span> 输入课程名 → 点「⚡ 立即开抢」🎯
+  </div>
+</section>
+
+<!-- 使用技巧 -->
+<section>
+  <h2>📝 使用技巧</h2>
+
+  <div class="tip">
+    <div class="label">⏰ 提前登录</div>
+    提前 10 分钟打开教务系统并登录，别卡在登录那步
+  </div>
+
+  <div class="tip">
+    <div class="label">📋 提前存好课程名</div>
+    把想抢的课存在备忘录里，从高到低依次输入，一门一门抢
+  </div>
+
+  <div class="tip">
+    <div class="label">🤖 自动模式最省心</div>
+    还没到选课时间？<br>
+    ① 输入课程名<br>
+    ② 设时间（如 14:00）<br>
+    ③ 勾选「自动刷新保活」<br>
+    ④ 点「🚀 启动自动模式」<br>
+    页面自己刷新保活 → 到点自动开抢 → 你回来看结果
+  </div>
+
+  <div class="tip">
+    <div class="label">💡 课程名不用打全</div>
+    输入关键词就行，「潮州菜」也能匹配到「舌尖上的潮州菜」
+  </div>
+</section>
+
+<!-- 常见问题 -->
+<section>
+  <h2>❓ 常见问题</h2>
+
+  <div class="faq-item">
+    <div class="faq-q">面板没弹出来？</div>
+    <div class="faq-a">
+      ① 检查 🐒 是否灰色 → 点一下变彩色<br>
+      ② 检查 URL 是否为选课页面（含 <code>eams</code>）<br>
+      ③ 检查「允许访问文件网址」是否打开<br>
+      ④ 刷新页面<br>
+      ⑤ 重装脚本
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">显示「未出现」？</div>
+    <div class="faq-a">
+      课程还没显示在这个页面，脚本会自动翻页查找，等一等就行
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">页面不停刷新？</div>
+    <div class="faq-a">
+      点面板里的「✖ 取消自动刷新」按钮
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">抢完了怎么抢别的课？</div>
+    <div class="faq-a">
+      按钮变成「🔄 继续抢课」→ 点它 → 输入新课名 → 再点开抢
+    </div>
+  </div>
+
+  <div class="faq-item">
+    <div class="faq-q">一直「人数已满」抢不到？</div>
+    <div class="faq-a">
+      脚本会无限重试，有人退课就会抢到。如果确定没希望了，点「⏹ 停止」
+    </div>
+  </div>
+</section>
+
+</div>
+
+<footer>
+  韩师抢课助手 · MIT License<br>
+  <a href="https://gitee.com/mangohia/hstc-course-grabber" target="_blank">Gitee 仓库</a>
+  — <span class="star">⭐</span> Star 支持一下！
+</footer>
+
+<script>
+  document.querySelectorAll('.faq-q').forEach(q => {
+    q.addEventListener('click', () => {
+      q.parentElement.classList.toggle('open');
+    });
+  });
+</script>
+
+</body>
+</html>
