@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.0
+// @version      5.3
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -33,7 +33,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.0';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.3';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -327,9 +327,16 @@
             updateCourseStatus(index, `❌ ${reason}`, '#e74c3c');
             status.clicked.pop();
             status.pendingConfirm = false;
-            // 点"确定"关闭弹窗
-            const btn = dialog.querySelector('.modal-confirm-button, button:not(:disabled)');
-            if (btn && btn.textContent.includes('确定')) btn.click();
+            // 关闭弹窗（多种方式确保关掉）
+            const closeBtn = document.querySelector('.modal-confirm-button, button:not(:disabled)');
+            if (closeBtn && closeBtn.textContent.includes('确定')) {
+                closeBtn.click();
+                addLog(`🔘 已关闭弹窗`);
+            } else {
+                // 兜底：弹窗里的任意按钮都点
+                const anyBtn = dialog.querySelector('a, button, span');
+                if (anyBtn) anyBtn.click();
+            }
             return;
         }
 
@@ -409,7 +416,7 @@
         } catch (e) { /* 静默失败 */ }
 
         // 检测分页
-        let pagTotal = 0, pagTarget = 1, pagPendingNav = false, pagWaitTicks = 0;
+        let pagTotal = 0, pagTarget = 1, pagPendingNav = false, pagWaitTicks = 0, foundPage = 0;
         try {
             const allP = document.querySelectorAll('a[pageno]');
             for (const el of allP) {
@@ -483,6 +490,10 @@
                         if (match) {
                             found = true;
                             if (!status.clicked.includes(index)) {
+                                if (!foundPage) {
+                                    foundPage = pagTarget;
+                                    addLog(`📌 课程在第 ${foundPage} 页，锁定该页重试`);
+                                }
                                 addLog(`🎯 找到「${courseName}」，正在点击选课...`);
                                 updateCourseStatus(index, '🔄 点击中...', '#f90');
                                 // 记录该课程所在的页码（失败后跳回重试）
@@ -524,8 +535,8 @@
                 return;
             }
 
-            // 翻页：一直往前翻，到末页后跳回第1页重新扫（有未确认的点击时暂停翻页）
-            if (pagTotal > 1 && !status.stopped && !pagPendingNav && status.clicked.length === status.confirmed.length) {
+            // 翻页：一直往前翻，到末页后跳回第1页重新扫（找到课程后锁定该页）
+            if (pagTotal > 1 && !status.stopped && !pagPendingNav && !foundPage && status.clicked.length === status.confirmed.length) {
                 pagWaitTicks++;
                 if (pagWaitTicks >= 1) {
                     pagWaitTicks = 0;
