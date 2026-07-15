@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      3.9
+// @version      4.0
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -21,7 +21,7 @@
     const CONFIRM_WAIT = 1500;            // 点击选课后等弹窗的时间(ms)
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '3.9';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '4.0';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -361,8 +361,8 @@
             }
         } catch (e) { /* 静默失败 */ }
 
-        // 检测分页，准备自动翻页
-        let pagTotal = 0, pagTarget = 1, pagGoingBack = true, pagPendingNav = false, pagWaitTicks = 0;
+        // 检测分页
+        let pagTotal = 0, pagTarget = 1, pagPendingNav = false, pagWaitTicks = 0;
         try {
             const allP = document.querySelectorAll('a[pageno]');
             for (const el of allP) {
@@ -370,17 +370,12 @@
                 if (n > pagTotal) pagTotal = n;
             }
             if (pagTotal > 1) {
-                // 先判断当前在第几页，再决定方向
                 const curEl = document.querySelector('a.pgButtonHover, a.current, a.active');
-                let curPage = 1;
                 if (curEl) {
                     const cn = parseInt(curEl.getAttribute('pageno') || curEl.textContent.trim());
-                    if (cn > 0) { curPage = cn; pagTarget = cn; }
+                    if (cn > 0) pagTarget = cn;
                 }
-                // 如果已经在第1页，直接向前翻；否则先往回翻
-                pagGoingBack = curPage > 1;
-                if (pagGoingBack) addLog(`📄 从第${curPage}页往回翻到第1页`);
-                else addLog(`📄 从第1页开始向前扫描`);
+                addLog(`📄 共 ${pagTotal} 页，当前第 ${pagTarget} 页，向前扫描`);
             }
         } catch (e) { /* 静默 */ }
 
@@ -474,68 +469,53 @@
                 return;
             }
 
-            // 翻页：用 a[pageno] 跳页（不依赖 DOM 读当前页，用 pagTarget 自己跟踪）
+            // 翻页：一直往前翻，到末页后跳回第1页重新扫
             if (pagTotal > 1 && !status.stopped && !pagPendingNav) {
                 pagWaitTicks++;
                 if (pagWaitTicks >= 1) {
                     pagWaitTicks = 0;
                     let targetPage = null;
-
-                    if (pagGoingBack) {
-                        // 优先直接跳第1页
+                    // 找大于当前页的最小可见页码
+                    try {
+                        const allLinks = document.querySelectorAll('a[pageno]:not(.disabled)');
+                        for (const el of allLinks) {
+                            const n = parseInt(el.getAttribute('pageno'));
+                            if (n > 0 && n > pagTarget && (targetPage === null || n < targetPage)) {
+                                targetPage = n;
+                            }
+                        }
+                    } catch {}
+                    if (targetPage === null) {
+                        // 到底了 → 跳回第1页重新扫
                         const p1 = document.querySelector('a[pageno="1"]:not(.disabled)');
                         if (p1) {
                             targetPage = 1;
-                            pagGoingBack = false;
-                            addLog('📄 直接跳到第1页');
+                            addLog('📄 已到末页，跳回第1页重新扫描');
                         } else {
-                            // 找小于 pagTarget 的最大可见页码
+                            // 第1页不在DOM → 找最小的可见页码
                             try {
                                 const allLinks = document.querySelectorAll('a[pageno]:not(.disabled)');
                                 for (const el of allLinks) {
                                     const n = parseInt(el.getAttribute('pageno'));
-                                    if (n > 0 && n < pagTarget && (targetPage === null || n > targetPage)) {
+                                    if (n > 0 && (targetPage === null || n < targetPage)) {
                                         targetPage = n;
                                     }
                                 }
                             } catch {}
-                            if (targetPage === null) {
-                                pagGoingBack = false;
-                                addLog('📄 已在第1页，开始向前翻');
+                            if (targetPage !== null) {
+                                addLog(`📄 已到末页，跳到第 ${targetPage} 页重新扫描`);
+                            } else {
+                                addLog('📄 没有可见页码');
                             }
-                        }
-                    } else {
-                        // 向前翻：找大于 pagTarget 的最小可见页码
-                        try {
-                            const allLinks = document.querySelectorAll('a[pageno]:not(.disabled)');
-                            for (const el of allLinks) {
-                                const n = parseInt(el.getAttribute('pageno'));
-                                if (n > 0 && n > pagTarget && (targetPage === null || n < targetPage)) {
-                                    targetPage = n;
-                                }
-                            }
-                        } catch {}
-                        if (targetPage === null) {
-                            pagTotal = 0;
-                            addLog('📄 已扫描完所有页面');
                         }
                     }
-
                     if (targetPage !== null && targetPage <= pagTotal) {
                         const link = document.querySelector(`a[pageno="${targetPage}"]`);
                         if (link && !link.disabled && !link.classList.contains('disabled')) {
                             link.click();
                             pagPendingNav = true;
-                            pagTarget = targetPage; // 立即更新，不等 AJAX
+                            pagTarget = targetPage;
                             addLog(`📄 跳到第 ${targetPage} 页`);
-                        } else {
-                            if (pagGoingBack) {
-                                pagGoingBack = false;
-                                addLog('📄 无法往回跳，开始向前翻');
-                            } else {
-                                pagTotal = 0;
-                                addLog('📄 已扫描完所有页面');
-                            }
                         }
                     }
                 }
