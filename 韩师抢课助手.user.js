@@ -407,7 +407,7 @@
         function attemptGrab() {
             if (status.stopped) return;
 
-            // 等待 AJAX 翻页加载完成
+            try {
             if (pagPendingNav) {
                 pagWaitTicks++;
                 if (pagWaitTicks < 3) {
@@ -516,6 +516,13 @@
                 const manualBtn = document.getElementById('hstc-manual-start');
                 if (manualBtn) { manualBtn.textContent = '🔄 重新开抢'; manualBtn.style.background = '#238FBF'; manualBtn.disabled = false; }
             }
+        } catch (e) {
+            addLog(`❌ attemptGrab 异常: ${e.message}`);
+            // 错误后继续循环，不卡死
+            if (!status.stopped && attempts < maxAttempts) {
+                status.timer = setTimeout(attemptGrab, 500);
+            }
+        }
         }
 
         attemptGrab();
