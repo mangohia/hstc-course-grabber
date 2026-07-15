@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.5
+// @version      5.6
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -36,7 +36,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.5';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.6';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -339,8 +339,17 @@
         status.confirmed.push(index);
         disableGrabDialogs();
         status.stopped = true;
+        status.started = false;
+        status.done = true;
         status.pendingConfirm = false;
         if (status.timer) { clearTimeout(status.timer); status.timer = null; }
+        // 恢复按钮，方便继续抢别的课
+        const manualBtn = document.getElementById('hstc-manual-start');
+        if (manualBtn) { manualBtn.textContent = '⚡ 继续抢课'; manualBtn.style.background = '#e67e22'; manualBtn.disabled = false; }
+        // 自动切到已选课程查看（可选）
+        if (AUTO_CHECK) {
+            setTimeout(switchToSelectedTab, 1000);
+        }
     }
     function findVisibleDialog() {
         // 常见弹窗 CSS 类
@@ -392,6 +401,18 @@
             status.started = false;
             return;
         }
+
+        // 切回可选课程标签（如果当前在"已选课程"等别的标签）
+        try {
+            for (const el of document.querySelectorAll('a, span, div')) {
+                const txt = el.textContent.trim();
+                if (txt.includes('可选课程') || txt.includes('选课管理') || txt.includes('网上选课')) {
+                    el.click();
+                    addLog(`📋 已切换到「${txt}」`);
+                    break;
+                }
+            }
+        } catch {}
 
         // 尝试把每页显示调到最大，让所有课程出现在一页
         try {
@@ -499,7 +520,8 @@
                                     const domBtn = document.querySelector('.modal-confirm-button');
                                     if ((domBtn && domBtn.offsetParent !== null) || lastResultMsg) {
                                         clearInterval(pollTimer);
-                                        handleConfirm(courseName, index);
+                                        // 等 400ms 让页面渲染稳定再处理弹窗
+                                        setTimeout(() => handleConfirm(courseName, index), 400);
                                     }
                                 }, 200);
                             }
