@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.8.3
+// @version      5.8.4
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -36,7 +36,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.8.3';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.8.4';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -540,14 +540,12 @@
                     }
                 }
 
-                // 轮流扫描所有未确认的课程
+                // 只尝试 nextCourseIndex 指向的那门课，找不到就翻页
                 const total = status.courses.length;
-                for (let offset = 0; offset < total; offset++) {
-                    if (status.pendingConfirm) break;
-                    const ci = (nextCourseIndex + offset) % total;
+                const ci = nextCourseIndex;
+                if (ci < total && !status.confirmed.includes(ci)) {
                     const courseName = status.courses[ci];
                     const index = ci;
-                    if (status.confirmed.includes(index)) continue;
 
                     let found = false;
                     for (const btnInfo of allBtns) {
@@ -585,6 +583,10 @@
 
                     if (!found && !status.clicked.includes(index)) {
                         updateCourseStatus(index, '🔍 未出现', '#999');
+                        // 当前页没有这门课 → 换下一门试
+                        if (status.courses.length > 1) {
+                            nextCourseIndex = (index + 1) % status.courses.length;
+                        }
                     }
                 }
             } catch (e) {
