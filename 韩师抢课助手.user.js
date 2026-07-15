@@ -487,20 +487,28 @@
                         if (curEl) curPage = parseInt(curEl.getAttribute('pageno') || curEl.textContent.trim()) || 0;
                     } catch {}
                     if (pagGoingBack) {
-                        // 找小于当前页的最大可见页码（逐步往回翻）
-                        try {
-                            const allLinks = document.querySelectorAll('a[pageno]:not(.disabled)');
-                            for (const el of allLinks) {
-                                const n = parseInt(el.getAttribute('pageno'));
-                                if (n > 0 && n < (curPage || pagTotal) && (targetPage === null || n > targetPage)) {
-                                    targetPage = n;
+                        // 优先尝试直接跳第1页
+                        const pageOneLink = document.querySelector('a[pageno="1"]:not(.disabled)');
+                        if (pageOneLink) {
+                            targetPage = 1;
+                            pagGoingBack = false; // 跳完就直接改向前翻
+                            addLog('📄 直接跳到第1页');
+                        } else {
+                            // 第1页不在DOM里 → 找小于当前页的最大可见页码（逐步往回翻）
+                            try {
+                                const allLinks = document.querySelectorAll('a[pageno]:not(.disabled)');
+                                for (const el of allLinks) {
+                                    const n = parseInt(el.getAttribute('pageno'));
+                                    if (n > 0 && n < (curPage || pagTotal) && (targetPage === null || n > targetPage)) {
+                                        targetPage = n;
+                                    }
                                 }
+                            } catch {}
+                            if (targetPage === null) {
+                                // 没有更小的页码了 → 已在第1页
+                                pagGoingBack = false;
+                                addLog('📄 已在第1页，开始向前翻');
                             }
-                        } catch {}
-                        if (targetPage === null) {
-                            // 没有更小的页码了 → 已在第1页
-                            pagGoingBack = false;
-                            addLog('📄 已在第1页，开始向前翻');
                         }
                     } else {
                         // 向前翻：当前页 + 1
