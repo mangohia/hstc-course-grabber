@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      4.9
+// @version      5.0
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -33,7 +33,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '4.9';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.0';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -327,8 +327,9 @@
             updateCourseStatus(index, `❌ ${reason}`, '#e74c3c');
             status.clicked.pop();
             status.pendingConfirm = false;
-            const closeBtn = findBtn(dialog, ['确定', '确认', '关闭']);
-            if (closeBtn) closeBtn.click();
+            // 点"确定"关闭弹窗
+            const btn = dialog.querySelector('.modal-confirm-button, button:not(:disabled)');
+            if (btn && btn.textContent.includes('确定')) btn.click();
             return;
         }
 
@@ -340,8 +341,6 @@
         status.stopped = true;
         status.pendingConfirm = false;
         if (status.timer) { clearTimeout(status.timer); status.timer = null; }
-        const closeBtn = findBtn(dialog, ['确定', '确认', '关闭']);
-        if (closeBtn) closeBtn.click();
     }
 
     function findVisibleDialog() {
@@ -350,17 +349,21 @@
             '.dialog', '.messager-window', '.window', '.panel',
             '[class*="dialog"]', '[class*="messager"]',
             '[role="dialog"]', '[role="alert"]',
-            '.easyui-dialog', '.lwindow', '.l-dialog'
+            '.easyui-dialog', '.lwindow', '.l-dialog',
+            '.modal-confirm-button' // 选课结果弹窗
         ];
         for (const sel of selectors) {
             const el = document.querySelector(sel);
-            if (el && el.style.display !== 'none' && el.offsetParent !== null) return el;
+            if (el && el.style.display !== 'none' && el.offsetParent !== null) {
+                // 如果匹配到的是按钮本身，返回其父容器
+                return el.tagName === 'BUTTON' ? el.closest('div, form') || el.parentElement : el;
+            }
         }
         // 兜底：找所有 visible 且带"确定"按钮的顶层浮层
         for (const el of document.querySelectorAll('div, span, form')) {
             const style = window.getComputedStyle(el);
             if ((style.position === 'fixed' || style.position === 'absolute') &&
-                parseInt(style.zIndex) > 100 &&
+                parseInt(style.zIndex) > 50 &&
                 el.offsetParent !== null &&
                 el.textContent.includes('确定')) {
                 return el;
