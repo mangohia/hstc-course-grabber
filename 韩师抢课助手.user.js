@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.7
+// @version      5.8
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -36,7 +36,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.7';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.8';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -303,8 +303,12 @@
     }
 
     function handleConfirm(courseName, index) {
-        // 优先用 alert 捕获的结果文字（原生弹窗），其次用 DOM 弹窗
+        // 获取结果文字：alert 捕获 > ColorBox 弹窗 > DOM 确认弹窗
         const text = lastResultMsg || (() => {
+            const content = document.getElementById('cboxContent');
+            if (content) return content.textContent || '';
+            const title = document.getElementById('cboxTitle');
+            if (title) return title.textContent || '';
             const btn = document.querySelector('.modal-confirm-button');
             const d = btn ? (btn.closest('div[class], form') || btn.parentElement) : null;
             return d ? d.textContent || '' : '';
@@ -329,7 +333,12 @@
             updateCourseStatus(index, `❌ ${reason}`, '#e74c3c');
             status.clicked.pop();
             status.pendingConfirm = false;
-            lastResultMsg = ''; // 清除，准备下一次
+            lastResultMsg = '';
+            // 关闭弹窗：优先 ColorBox close，其次确认按钮
+            const cboxClose = document.getElementById('cboxClose');
+            if (cboxClose) { cboxClose.click(); return; }
+            const failBtn = document.querySelector('.modal-confirm-button');
+            if (failBtn) failBtn.click();
             return;
         }
 
@@ -340,6 +349,9 @@
         disableGrabDialogs();
         status.pendingConfirm = false;
         if (status.timer) { clearTimeout(status.timer); status.timer = null; }
+        // 关闭 ColorBox 弹窗
+        const cboxClose = document.getElementById('cboxClose');
+        if (cboxClose) cboxClose.click();
 
         // 还有未完成的课程 → 继续抢下一门
         if (status.confirmed.length < status.courses.length) {
