@@ -474,32 +474,52 @@
                 return;
             }
 
-            // 翻页：先往回走到第1页，再向前走到最后一页
+            // 翻页：用 a[pageno] 直接跳页（比搜"上一页""下一页"文本更可靠）
             if (pagTotal > 1 && !status.stopped && !pagPendingNav) {
                 pagWaitTicks++;
                 if (pagWaitTicks >= 1) {
                     pagWaitTicks = 0;
-                    const btnText = pagGoingBack ? '上一页' : '下一页';
-                    const altTexts = pagGoingBack ? ['<', '«', '上页'] : ['>', '»'];
-                    let clicked = false;
-                    for (const el of document.querySelectorAll('a, span')) {
-                        if (el.closest('table')) continue;
-                        const t = el.textContent.trim();
-                        if (t === btnText || altTexts.includes(t)) {
-                            if (!el.disabled && !el.classList.contains('disabled')) {
-                                el.click();
-                                pagPendingNav = true;
-                                clicked = true;
-                                break;
+                    let targetPage = null;
+                    if (pagGoingBack) {
+                        targetPage = 1; // 直接跳到第1页
+                    } else {
+                        // 获取当前页 → 翻下一页
+                        try {
+                            const curEl = document.querySelector('a.pgButtonHover, a.current, a.active');
+                            if (curEl) {
+                                const cn = parseInt(curEl.getAttribute('pageno') || curEl.textContent.trim());
+                                if (cn > 0) targetPage = cn + 1;
+                            }
+                        } catch {}
+                    }
+                    if (targetPage !== null && targetPage <= pagTotal) {
+                        const link = document.querySelector(`a[pageno="${targetPage}"]`);
+                        if (link && !link.disabled && !link.classList.contains('disabled')) {
+                            link.click();
+                            pagPendingNav = true;
+                            if (pagGoingBack) {
+                                pagGoingBack = false; // 跳第1页后改向前翻
+                                addLog('📄 跳到第1页，准备向前扫描');
+                            } else {
+                                addLog(`📄 跳到第 ${targetPage} 页`);
+                            }
+                        } else {
+                            // 目标页链接不可用（翻完了）
+                            if (pagGoingBack) {
+                                pagGoingBack = false;
+                                addLog('📄 已在第1页，开始向前翻');
+                            } else {
+                                pagTotal = 0;
+                                addLog('📄 已扫描完所有页面');
                             }
                         }
-                    }
-                    if (!clicked) {
+                    } else {
+                        // 无有效目标页
                         if (pagGoingBack) {
-                            pagGoingBack = false; // 回到第1页了，改向前翻
-                            addLog('📄 已到第1页，开始向前翻');
+                            pagGoingBack = false;
+                            addLog('📄 已在第1页，开始向前翻');
                         } else {
-                            pagTotal = 0; // 全部翻完
+                            pagTotal = 0;
                             addLog('📄 已扫描完所有页面');
                         }
                     }
