@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.8.6
+// @version      5.8.7
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -36,7 +36,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.8.6';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.8.7';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -207,7 +207,7 @@
                     width:100%;box-sizing:border-box;padding:6px 8px;
                     border:1px solid #ddd;border-radius:6px;font-size:13px;
                     resize:vertical;font-family:inherit;
-                " placeholder="舌尖上的潮州菜&#10;财经新闻与理财&#10;（输入课程名 或 课程序号均可）"></textarea>
+                " placeholder="输入课程名称&#10;（例如：数学的奥秘）&#10;每次只输入一门课"></textarea>
             </div>
 
             <div id="hstc-course-status" style="margin-bottom:8px;display:none;"></div>
