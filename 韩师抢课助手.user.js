@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      4.2
+// @version      4.3
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -23,7 +23,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '4.2';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '4.3';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -438,10 +438,14 @@
                                 updateCourseStatus(index, '🔄 点击中...', '#f90');
                                 btnInfo.element.click();
                                 status.clicked.push(index);
-
-                                setTimeout(() => {
-                                    handleConfirm(courseName, index);
-                                }, CONFIRM_WAIT);
+                                // 点击后停止抢课循环，弹窗交给用户手动处理
+                                status.stopped = true;
+                                if (status.timer) { clearTimeout(status.timer); status.timer = null; }
+                                addLog('⏸️ 已点击选课，弹窗请手动确认');
+                                updateCourseStatus(index, '👆 请手动确认弹窗', '#e67e22');
+                                // 恢复按钮状态，方便用户停止后重试
+                                const manualBtn = document.getElementById('hstc-manual-start');
+                                if (manualBtn) { manualBtn.textContent = '⚡ 重新开抢'; manualBtn.style.background = '#e67e22'; manualBtn.disabled = false; }
                             }
                             break;
                         }
