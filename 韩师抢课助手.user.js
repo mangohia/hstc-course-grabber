@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.8.5
+// @version      5.8.6
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -36,7 +36,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.8.5';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.8.6';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -334,10 +334,7 @@
             status.clicked.pop();
             status.pendingConfirm = false;
             lastResultMsg = '';
-            // 轮到下一门课，清除该课的位置记录（不再跳回）
-            nextCourseIndex = (index + 1) % status.courses.length;
             foundPage = 0;
-            delete status.coursePage[index];
             // 关闭弹窗：优先 ColorBox close，其次确认按钮
             const cboxClose = document.getElementById('cboxClose');
             if (cboxClose) { cboxClose.click(); return; }
@@ -360,7 +357,6 @@
         if (status.confirmed.length < status.courses.length) {
             addLog(`📋 已完成 ${status.confirmed.length}/${status.courses.length}，继续抢下一门`);
             foundPage = 0;
-            nextCourseIndex = 0;
             status.clicked = [];
             return;
         }
@@ -461,7 +457,7 @@
         } catch (e) { /* 静默失败 */ }
 
         // 检测分页
-        let pagTotal = 0, pagTarget = 1, pagPendingNav = false, pagWaitTicks = 0, foundPage = 0, nextCourseIndex = 0;
+        let pagTotal = 0, pagTarget = 1, pagPendingNav = false, pagWaitTicks = 0, foundPage = 0;
         try {
             const allP = document.querySelectorAll('a[pageno]');
             for (const el of allP) {
@@ -525,32 +521,15 @@
             try {
                 const allBtns = findAllCourseButtons();
 
-                // 如果下一门课有记住的页码，直接跳过去
-                const nextIdx = nextCourseIndex;
-                if (nextIdx < status.courses.length && !status.confirmed.includes(nextIdx)) {
-                    const savedPage = status.coursePage[nextIdx];
-                    if (savedPage && savedPage !== pagTarget && pagTotal > 1) {
-                        const link = document.querySelector(`a[pageno="${savedPage}"]:not(.disabled)`);
-                        if (link) {
-                            link.click();
-                            pagPendingNav = true;
-                            pagTarget = savedPage;
-                            addLog(`📌 跳转到「${status.courses[nextIdx]}」所在第 ${savedPage} 页`);
-                            throw 'jump'; // 跳过扫描，进入下一轮
-                        }
-                    }
-                }
-
-                // 只尝试 nextCourseIndex 指向的那门课，找不到就翻页
-                const total = status.courses.length;
-                const ci = nextCourseIndex;
-                if (ci < total && !status.confirmed.includes(ci)) {
-                    const courseName = status.courses[ci];
+                // 扫描所有课程，每次只点一门
+                for (let ci = 0; ci < status.courses.length; ci++) {
+                    if (status.pendingConfirm) break;
                     const index = ci;
+                    const courseName = status.courses[index];
+                    if (status.confirmed.includes(index)) continue;
 
                     let found = false;
                     for (const btnInfo of allBtns) {
-                        // 逐一检查每个单元格，匹配即可
                         const match = btnInfo.cellTexts.some(t => t.includes(courseName));
                         if (match) {
                             found = true;
@@ -561,19 +540,17 @@
                                 }
                                 addLog(`🎯 找到「${courseName}」，正在点击选课...`);
                                 updateCourseStatus(index, '🔄 点击中...', '#f90');
-                                // 记录该课程所在的页码（失败后跳回重试）
                                 status.coursePage[index] = pagTarget;
                                 btnInfo.element.click();
                                 status.clicked.push(index);
-                                status.pendingConfirm = true; // 暂停扫描，等弹窗处理完
-                                // 轮询检测弹窗结果（DOM弹窗或原生alert）
+                                status.pendingConfirm = true;
+                                // 轮询检测弹窗结果
                                 const pollTimer = setInterval(() => {
                                     if (status.stopped) { clearInterval(pollTimer); return; }
                                     const domBtn = document.querySelector('.modal-confirm-button');
                                     const cboxBtn = document.getElementById('cboxClose');
                                     if ((domBtn && domBtn.offsetParent !== null) || cboxBtn || lastResultMsg) {
                                         clearInterval(pollTimer);
-                                        // 等 400ms 让页面渲染稳定再处理弹窗
                                         setTimeout(() => handleConfirm(courseName, index), 400);
                                     }
                                 }, 200);
@@ -584,14 +561,10 @@
 
                     if (!found && !status.clicked.includes(index)) {
                         updateCourseStatus(index, '🔍 未出现', '#999');
-                        // 当前页没有这门课 → 换下一门试
-                        if (status.courses.length > 1) {
-                            nextCourseIndex = (index + 1) % status.courses.length;
-                        }
                     }
                 }
             } catch (e) {
-                if (e !== 'jump') addLog(`⚠️ 抢课循环异常: ${e.message}`);
+                addLog(`⚠️ 抢课循环异常: ${e.message}`);
             }
             } // end else (pendingConfirm skip-scan)
 
