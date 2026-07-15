@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      4.5
+// @version      4.6
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -23,13 +23,14 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '4.5';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '4.6';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
         courses: [],
         clicked: [],
         confirmed: [],
+        coursePage: {}, // index → 页码，失败后跳回重试
         started: false,
         stopped: false,
         timer: null,
@@ -332,6 +333,12 @@
             addLog(`❌ 「${courseName}」${reason}，关闭弹窗继续`);
             updateCourseStatus(index, `❌ ${reason}`, '#e74c3c');
             status.clicked.pop();
+            // 跳回该课程所在页面，立即重试
+            const coursePage = status.coursePage[index];
+            if (coursePage && coursePage > 1) {
+                pagTarget = coursePage - 1; // 设成前一页，下一页就会跳回去
+                addLog(`📌 记住「${courseName}」在第 ${coursePage} 页，准备跳回重试`);
+            }
             const closeBtn = findBtn(dialog, ['确定', '确认', '关闭']);
             if (closeBtn) closeBtn.click();
             return;
@@ -483,6 +490,8 @@
                             if (!status.clicked.includes(index)) {
                                 addLog(`🎯 找到「${courseName}」，正在点击选课...`);
                                 updateCourseStatus(index, '🔄 点击中...', '#f90');
+                                // 记录该课程所在的页码（失败后跳回重试）
+                                status.coursePage[index] = pagTarget;
                                 btnInfo.element.click();
                                 status.clicked.push(index);
                                 // 等待弹窗并自动处理
