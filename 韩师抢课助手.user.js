@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      5.8.4
+// @version      5.8.5
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -36,7 +36,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '5.8.4';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '5.8.5';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -334,9 +334,10 @@
             status.clicked.pop();
             status.pendingConfirm = false;
             lastResultMsg = '';
-            // 轮到下一门课
+            // 轮到下一门课，清除该课的位置记录（不再跳回）
             nextCourseIndex = (index + 1) % status.courses.length;
             foundPage = 0;
+            delete status.coursePage[index];
             // 关闭弹窗：优先 ColorBox close，其次确认按钮
             const cboxClose = document.getElementById('cboxClose');
             if (cboxClose) { cboxClose.click(); return; }
