@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         韩师抢课助手
 // @namespace    https://gitee.com/mangohia/hstc-course-grabber
-// @version      4.3
+// @version      4.4
 // @description  韩山师范学院自动抢选修课 — 输入课程、设置时间、自动刷新页面、到点自动开抢
 // @author       mangohia
 // @match        *://*/*eams/*
@@ -23,7 +23,7 @@
     const AJAX_WAIT_TICKS = 2;            // AJAX翻页等待的尝试次数
     const DEFAULT_REFRESH_INTERVAL = 30;  // 自动刷新间隔(秒)
     const LS_KEY = 'hstc_grabber_v2';     // localStorage 存储键
-    const SCRIPT_VER = '4.3';  // ↑ 改 @version 时同步改这里
+    const SCRIPT_VER = '4.4';  // ↑ 改 @version 时同步改这里
 
     // ===== 状态 =====
     let status = {
@@ -288,52 +288,75 @@
     }
 
     function handleConfirm(courseName, index) {
-        const confirmBtn = document.querySelector(
-            '.dialog-confirm button, .confirm-btn, .messager-button .l-btn, [class*="confirm"] a, .dialog-button a:first-child'
-        );
-        if (confirmBtn) {
-            addLog(`✅ 「${courseName}」弹窗确认中...`);
-            confirmBtn.click();
+        // 找可见弹窗
+        const dialog = findVisibleDialog();
+        if (!dialog) {
+            // 没弹窗，可能直接成功了
+            addLog(`✅ 「${courseName}」可能已选课成功`);
             updateCourseStatus(index, '✅ 已抢到！', '#0a0');
             status.confirmed.push(index);
-        } else {
-            const dialog = document.querySelector(
-                '.dialog, .messager-window, [class*="dialog"], [role="dialog"]'
-            );
-            if (dialog && dialog.style.display !== 'none') {
-                const btns = dialog.querySelectorAll('a, button, span');
-                for (const btn of btns) {
-                    const txt = btn.textContent || '';
-                    if (txt.includes('确定') || txt.includes('确认') || txt.includes('是')) {
-                        addLog(`✅ 「${courseName}」弹窗确认中...`);
-                        btn.click();
-                        updateCourseStatus(index, '✅ 已抢到！', '#0a0');
-                        status.confirmed.push(index);
-                        return;
-                    }
-                }
-            }
-            setTimeout(() => {
-                const dialog2 = document.querySelector(
-                    '.dialog, .messager-window, [class*="dialog"], [role="dialog"]'
-                );
-                if (dialog2 && dialog2.style.display !== 'none') {
-                    const btns = dialog2.querySelectorAll('a, button, span');
-                    for (const btn of btns) {
-                        const txt = btn.textContent || '';
-                        if (txt.includes('确定') || txt.includes('确认') || txt.includes('是')) {
-                            btn.click();
-                            updateCourseStatus(index, '✅ 已抢到！', '#0a0');
-                            status.confirmed.push(index);
-                            return;
-                        }
-                    }
-                }
-                addLog(`⚠️ 未检测到弹窗，可能已直接选课成功`);
-                updateCourseStatus(index, '✅ 已提交', '#0a0');
-                status.confirmed.push(index);
-            }, 2000);
+            status.stopped = true;
+            if (status.timer) { clearTimeout(status.timer); status.timer = null; }
+            return;
         }
+
+        const text = dialog.textContent || '';
+
+        // 第 1 步：是否提交？
+        if (text.includes('是否提交')) {
+            const btn = findBtn(dialog, ['确定', '确认']);
+            if (btn) {
+                btn.click();
+                addLog(`📋 「${courseName}」已提交，等待选课结果...`);
+                updateCourseStatus(index, '⏳ 等待结果...', '#f90');
+                // 2 秒后检查结果弹窗
+                setTimeout(() => handleConfirm(courseName, index), 2000);
+            } else {
+                addLog(`⚠️ 「${courseName}」找不到确定按钮`);
+                status.clicked.pop(); // 恢复，允许重试
+            }
+            return;
+        }
+
+        // 第 2 步：操作结果
+        const isFail = text.includes('失败') || text.includes('满') || text.includes('冲突');
+        if (isFail) {
+            const reason = text.includes('满') ? '人数已满'
+                         : text.includes('冲突') ? '时间冲突'
+                         : '选课失败';
+            addLog(`❌ 「${courseName}」${reason}，关闭弹窗继续`);
+            updateCourseStatus(index, `❌ ${reason}`, '#e74c3c');
+            status.clicked.pop(); // 移除点击记录，允许再次尝试
+            const closeBtn = findBtn(dialog, ['确定', '确认', '关闭']);
+            if (closeBtn) closeBtn.click();
+            // 不设 stopped，继续扫描循环
+            return;
+        }
+
+        // 没有失败关键词 → 视为成功
+        addLog(`✅ 「${courseName}」抢课成功！`);
+        updateCourseStatus(index, '✅ 已抢到！', '#0a0');
+        status.confirmed.push(index);
+        status.stopped = true;
+        if (status.timer) { clearTimeout(status.timer); status.timer = null; }
+        const closeBtn = findBtn(dialog, ['确定', '确认', '关闭']);
+        if (closeBtn) closeBtn.click();
+    }
+
+    function findVisibleDialog() {
+        const selectors = '.dialog, .messager-window, [class*="dialog"], [role="dialog"]';
+        for (const d of document.querySelectorAll(selectors)) {
+            if (d.style.display !== 'none' && d.offsetParent !== null) return d;
+        }
+        return null;
+    }
+
+    function findBtn(dialog, texts) {
+        for (const btn of dialog.querySelectorAll('a, button, span, input')) {
+            const t = (btn.textContent || btn.value || '').trim();
+            if (texts.some(txt => t.includes(txt))) return btn;
+        }
+        return null;
     }
 
     function startGrabbing(courses) {
@@ -399,7 +422,7 @@
         }
 
         let attempts = 0;
-        const maxAttempts = 600;
+        // 无限循环，用户手动停或抢到课才停
 
         function attemptGrab() {
             if (status.stopped) return;
@@ -438,14 +461,10 @@
                                 updateCourseStatus(index, '🔄 点击中...', '#f90');
                                 btnInfo.element.click();
                                 status.clicked.push(index);
-                                // 点击后停止抢课循环，弹窗交给用户手动处理
-                                status.stopped = true;
-                                if (status.timer) { clearTimeout(status.timer); status.timer = null; }
-                                addLog('⏸️ 已点击选课，弹窗请手动确认');
-                                updateCourseStatus(index, '👆 请手动确认弹窗', '#e67e22');
-                                // 恢复按钮状态，方便用户停止后重试
-                                const manualBtn = document.getElementById('hstc-manual-start');
-                                if (manualBtn) { manualBtn.textContent = '⚡ 重新开抢'; manualBtn.style.background = '#e67e22'; manualBtn.disabled = false; }
+                                // 等待弹窗并自动处理
+                                setTimeout(() => {
+                                    handleConfirm(courseName, index);
+                                }, CONFIRM_WAIT);
                             }
                             break;
                         }
@@ -527,20 +546,13 @@
                 }
             }
 
-            if (attempts < maxAttempts && !status.stopped) {
+            if (!status.stopped) {
                 status.timer = setTimeout(attemptGrab, SCAN_INTERVAL);
-            } else if (!status.stopped) {
-                addLog('⏰ 尝试次数已达上限，请手动操作');
-                updateCountdown('⚠️ 请手动操作');
-                status.done = true;
-                status.started = false;
-                const manualBtn = document.getElementById('hstc-manual-start');
-                if (manualBtn) { manualBtn.textContent = '🔄 重新开抢'; manualBtn.style.background = '#238FBF'; manualBtn.disabled = false; }
             }
         } catch (e) {
             addLog(`❌ attemptGrab 异常: ${e.message}`);
             // 错误后继续循环，不卡死
-            if (!status.stopped && attempts < maxAttempts) {
+            if (!status.stopped) {
                 status.timer = setTimeout(attemptGrab, SCAN_INTERVAL);
             }
         }
