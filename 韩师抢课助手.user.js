@@ -348,24 +348,20 @@
         status.confirmed.push(index);
         disableGrabDialogs();
         status.pendingConfirm = false;
-        if (status.timer) { clearTimeout(status.timer); status.timer = null; }
         // 关闭 ColorBox 弹窗
         const cboxClose = document.getElementById('cboxClose');
         if (cboxClose) cboxClose.click();
 
-        // 还有未完成的课程 → 继续抢下一门
+        // 还有未完成的课程 → 继续抢下一门（不清定时器，主循环自然继续）
         if (status.confirmed.length < status.courses.length) {
             addLog(`📋 已完成 ${status.confirmed.length}/${status.courses.length}，继续抢下一门`);
-            foundPage = 0; // 重置锁定，重新扫描所有页
-            status.clicked = []; // 清空点击记录，允许点新课
-            // 继续扫描循环
-            if (!status.stopped) {
-                status.timer = setTimeout(attemptGrab, SCAN_INTERVAL);
-            }
+            foundPage = 0;
+            status.clicked = [];
             return;
         }
 
         // 全部完成
+        if (status.timer) { clearTimeout(status.timer); status.timer = null; }
         status.stopped = true;
         status.started = false;
         status.done = true;
